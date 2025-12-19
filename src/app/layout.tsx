@@ -15,6 +15,12 @@ export const metadata: Metadata = {
   description: "Modern Islamic community management system with Arabic aesthetics",
 };
 
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 5,
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -23,6 +29,8 @@ export default function RootLayout({
   return (
     <html lang="ar" dir="ltr">
       <head>
+        <link rel="preconnect" href="https://ui-avatars.com" />
+        <link rel="dns-prefetch" href="https://ui-avatars.com" />
         {/* Inline style to prevent background flicker */}
         <style dangerouslySetInnerHTML={{
           __html: `

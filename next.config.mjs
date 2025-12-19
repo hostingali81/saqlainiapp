@@ -7,10 +7,14 @@ const nextConfig = {
         hostname: 'ui-avatars.com',
       },
     ],
+    formats: ['image/webp'],
   },
   compress: true,
   poweredByHeader: false,
   reactStrictMode: true,
+  experimental: {
+    optimizePackageImports: ['lucide-react', '@radix-ui/react-avatar'],
+  },
 };
 
 export default nextConfig;

@@ -17,6 +17,7 @@ interface UserCardProps {
 export function UserCard({ user, style }: UserCardProps) {
     const isDue = user.bakaya_month > 0;
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const isPriority = user.id <= 10;
 
     const handleImageClick = (e: React.MouseEvent) => {
         e.preventDefault();
@@ -31,7 +32,7 @@ export function UserCard({ user, style }: UserCardProps) {
     return (
         <>
             <div style={style} className="p-2">
-                <Link href={`/profile/${user.id}`}>
+                <Link href={`/profile/${user.id}`} prefetch={true}>
                     {/* GLASSMORPHISM CARD */}
                     <div className="glass-card rounded-[15px] p-4 flex items-center gap-3 relative overflow-hidden">
                         {/* Decorative emoji with float animation */}
@@ -49,7 +50,8 @@ export function UserCard({ user, style }: UserCardProps) {
                                     src={`/upload/small_image/${user.id}.jpg`}
                                     alt={user.name}
                                     className="h-[50px] w-[50px] rounded-full object-cover glass-avatar"
-                                    loading="lazy"
+                                    loading={isPriority ? "eager" : "lazy"}
+                                    fetchPriority={isPriority ? "high" : "auto"}
                                 />
                             ) : (
                                 <Avatar className="h-[50px] w-[50px] glass-avatar">
