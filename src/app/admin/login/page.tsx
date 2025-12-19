@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Lock } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { ClientHeader } from '@/components/ClientHeader';
 
 export default function AdminLoginPage() {
     const [username, setUsername] = useState('');
@@ -42,7 +43,9 @@ export default function AdminLoginPage() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <>
+            <ClientHeader />
+            <div className="min-h-screen flex items-center justify-center bg-background p-4">
             <Card className="w-full max-w-md">
                 <CardHeader>
                     <CardTitle className="flex items-center gap-2">
@@ -82,5 +85,6 @@ export default function AdminLoginPage() {
                 </CardContent>
             </Card>
         </div>
+        </>
     );
 }
