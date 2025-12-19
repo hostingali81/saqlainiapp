@@ -85,11 +85,24 @@ export function ImageModal({ isOpen, onClose, imageUrl, userName }: ImageModalPr
                         `
                     }}
                 >
+                    {/* Skeleton Loader */}
+                    {isLoading && !hasError && (
+                        <div className="w-full aspect-square rounded-xl relative overflow-hidden" style={{
+                            background: 'rgba(198, 168, 105, 0.15)'
+                        }}>
+                            <div className="absolute inset-0" style={{
+                                background: 'linear-gradient(90deg, transparent, rgba(198, 168, 105, 0.3), transparent)',
+                                backgroundSize: '200% 100%',
+                                animation: 'shimmer 1.5s infinite linear'
+                            }} />
+                        </div>
+                    )}
+
                     {/* Actual Image with golden glow */}
                     <img
                         src={imageUrl}
                         alt={userName}
-                        className="w-full h-auto rounded-xl object-contain max-h-[80vh] transition-opacity duration-300"
+                        className={`w-full h-auto rounded-xl object-contain max-h-[80vh] transition-opacity duration-300 ${isLoading ? 'hidden' : 'block'}`}
                         style={{
                             boxShadow: '0 0 50px rgba(198, 168, 105, 0.4)'
                         }}
