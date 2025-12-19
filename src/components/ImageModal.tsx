@@ -42,69 +42,70 @@ export function ImageModal({ isOpen, onClose, imageUrl, userName }: ImageModalPr
 
     return (
         <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-300"
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-200"
             style={{
-                background: 'rgba(13, 72, 59, 0.85)',
+                background: 'rgba(255, 248, 231, 0.6)', // More transparent
                 backdropFilter: 'blur(12px)',
-                WebkitBackdropFilter: 'blur(12px)'
+                WebkitBackdropFilter: 'blur(12px)',
             }}
             onClick={onClose}
         >
-            {/* Close Button with glass effect */}
-            <Button
-                variant="ghost"
-                size="icon"
-                className="absolute top-6 right-6 h-12 w-12 rounded-full smooth-hover z-10"
-                style={{
-                    background: 'rgba(198, 168, 105, 0.2)',
-                    backdropFilter: 'blur(8px)',
-                    border: '2px solid rgba(198, 168, 105, 0.4)',
-                    color: '#FFF8E7'
-                }}
-                onClick={onClose}
-            >
-                <X className="h-6 w-6" />
-            </Button>
-
-            {/* Image Container with glass border */}
+            {/* Image Container - Theme matching */}
             <div
-                className="relative max-w-3xl max-h-[85vh] w-full"
+                className="relative max-w-4xl max-h-[90vh] w-full"
                 onClick={(e) => e.stopPropagation()}
             >
-                {/* Glass Frame */}
-                <div
-                    className="relative p-2 rounded-2xl"
+                {/* Close Button - Positioned near image */}
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className="absolute -top-2 -right-2 h-10 w-10 rounded-full z-10 transition-all"
                     style={{
-                        background: 'rgba(255, 248, 231, 0.1)',
+                        background: 'rgba(198, 168, 105, 0.25)',
+                        backdropFilter: 'blur(8px)',
+                        color: '#145948',
+                        border: '1px solid rgba(198, 168, 105, 0.4)'
+                    }}
+                    onClick={onClose}
+                >
+                    <X className="h-5 w-5" />
+                </Button>
+
+                {/* Frame with glass effect */}
+                <div
+                    className="relative rounded-2xl overflow-hidden p-3"
+                    style={{
+                        background: 'rgba(255, 255, 255, 0.5)',
                         backdropFilter: 'blur(20px)',
-                        border: '3px solid rgba(198, 168, 105, 0.5)',
+                        WebkitBackdropFilter: 'blur(20px)',
+                        border: '2px solid rgba(198, 168, 105, 0.5)',
                         boxShadow: `
-                            0 0 40px rgba(198, 168, 105, 0.3),
-                            0 0 80px rgba(198, 168, 105, 0.1),
-                            0 8px 32px rgba(13, 72, 59, 0.4)
+                            0 20px 60px rgba(198, 168, 105, 0.3),
+                            0 0 0 1px rgba(198, 168, 105, 0.2) inset
                         `
                     }}
                 >
                     {/* Skeleton Loader */}
                     {isLoading && !hasError && (
                         <div className="w-full aspect-square rounded-xl relative overflow-hidden" style={{
-                            background: 'rgba(198, 168, 105, 0.15)'
+                            background: 'rgba(198, 168, 105, 0.1)'
                         }}>
                             <div className="absolute inset-0" style={{
-                                background: 'linear-gradient(90deg, transparent, rgba(198, 168, 105, 0.3), transparent)',
+                                background: 'linear-gradient(90deg, transparent, rgba(198, 168, 105, 0.2), transparent)',
                                 backgroundSize: '200% 100%',
                                 animation: 'shimmer 1.5s infinite linear'
                             }} />
                         </div>
                     )}
 
-                    {/* Actual Image with golden glow */}
+                    {/* Actual Image with golden border */}
                     <img
                         src={imageUrl}
                         alt={userName}
-                        className={`w-full h-auto rounded-xl object-contain max-h-[80vh] transition-opacity duration-300 ${isLoading ? 'hidden' : 'block'}`}
+                        className={`w-full h-auto object-contain max-h-[85vh] rounded-lg transition-opacity duration-300 ${isLoading ? 'hidden' : 'block'}`}
                         style={{
-                            boxShadow: '0 0 50px rgba(198, 168, 105, 0.4)'
+                            border: '3px solid #C6A869',
+                            boxShadow: '0 0 30px rgba(198, 168, 105, 0.5)'
                         }}
                         onLoad={() => setIsLoading(false)}
                         onError={() => {
@@ -113,35 +114,33 @@ export function ImageModal({ isOpen, onClose, imageUrl, userName }: ImageModalPr
                         }}
                     />
 
-                    {/* Error State with glass */}
+                    {/* Error State */}
                     {hasError && (
                         <div
-                            className="absolute inset-2 flex items-center justify-center rounded-xl"
+                            className="absolute inset-0 flex items-center justify-center rounded-xl"
                             style={{
-                                background: 'rgba(255, 248, 231, 0.3)',
-                                backdropFilter: 'blur(10px)'
+                                background: 'rgba(255, 248, 231, 0.95)',
                             }}
                         >
-                            <div className="text-center" style={{ color: '#FFF8E7' }}>
-                                <p className="text-lg font-bold mb-2">⚠️</p>
-                                <p>Failed to load image</p>
+                            <div className="text-center" style={{ color: '#145948' }}>
+                                <p className="text-4xl mb-2">⚠️</p>
+                                <p className="text-lg font-semibold">Failed to load image</p>
                             </div>
                         </div>
                     )}
 
-                    {/* User Name Label with glass */}
+                    {/* User Name Badge - Theme colors */}
                     {!isLoading && !hasError && (
                         <div
-                            className="absolute bottom-4 left-1/2 transform -translate-x-1/2 px-6 py-2 rounded-full"
+                            className="absolute bottom-6 left-1/2 transform -translate-x-1/2 px-6 py-3 rounded-full"
                             style={{
-                                background: 'rgba(13, 72, 59, 0.85)',
-                                backdropFilter: 'blur(10px)',
-                                border: '1px solid rgba(198, 168, 105, 0.5)',
+                                background: '#145948',
+                                border: '1px solid #C6A869',
                                 color: '#FFF8E7',
-                                boxShadow: '0 4px 12px rgba(198, 168, 105, 0.3)'
+                                boxShadow: '0 4px 12px rgba(198, 168, 105, 0.4)'
                             }}
                         >
-                            <p className="font-bold text-sm">{userName}</p>
+                            <p className="font-semibold text-sm">{userName}</p>
                         </div>
                     )}
                 </div>

@@ -47,7 +47,7 @@ export function Header({ totalAmount }: HeaderProps) {
                 {/* Total Amount with glass effect */}
                 <Link
                     href="/total_monthly_history"
-                    className="relative smooth-hover gold-glow"
+                    className="relative inline-flex items-center justify-center smooth-hover gold-glow rounded-full"
                 >
                     {formattedAmount !== null ? (
                         <div
