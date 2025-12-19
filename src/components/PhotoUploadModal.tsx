@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { User } from '@/types';
 import { Camera, Upload, Trash2 } from 'lucide-react';
+import Image from 'next/image';
 
 interface PhotoUploadModalProps {
     user: User | null;
@@ -168,9 +169,11 @@ export function PhotoUploadModal({ user, isOpen, onClose, onSuccess }: PhotoUplo
 
                     {/* Current Photo */}
                     <div className="flex justify-center">
-                        <img
+                        <Image
                             src={currentImageUrl}
                             alt={user.name}
+                            width={128}
+                            height={128}
                             className="w-32 h-32 rounded-full object-cover border-2 border-gray-200"
                         />
                     </div>

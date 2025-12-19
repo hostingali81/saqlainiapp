@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import { ImageModal } from './ImageModal';
 
@@ -46,12 +47,13 @@ export function UserCard({ user, style }: UserCardProps) {
                         {/* Avatar with glass effect */}
                         <div className="relative cursor-pointer flex-shrink-0" onClick={handleImageClick}>
                             {user.hasImage ? (
-                                <img
+                                <Image
                                     src={`/upload/small_image/${user.id}.jpg`}
                                     alt={user.name}
+                                    width={50}
+                                    height={50}
                                     className="h-[50px] w-[50px] rounded-full object-cover glass-avatar"
-                                    loading={isPriority ? "eager" : "lazy"}
-                                    fetchPriority={isPriority ? "high" : "auto"}
+                                    priority={isPriority}
                                 />
                             ) : (
                                 <Avatar className="h-[50px] w-[50px] glass-avatar">

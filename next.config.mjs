@@ -1,3 +1,5 @@
+
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
@@ -17,4 +19,7 @@ const nextConfig = {
   },
 };
 
+// export default withSerwist(nextConfig);
 export default nextConfig;
+
+

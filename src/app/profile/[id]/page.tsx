@@ -3,6 +3,7 @@ import { PaymentTimeline } from '@/components/PaymentTimeline';
 import { WhatsAppButton } from '@/components/WhatsAppButton';
 import { Header } from '@/components/Header';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Phone, User as UserIcon } from 'lucide-react';
 import Link from 'next/link';
@@ -57,13 +58,13 @@ export default async function ProfilePage({ params }: PageProps) {
                 >
                     {/* Profile Image - PHP exact style */}
                     {hasLargeImage ? (
-                        <img
+                        <Image
                             src={`/upload/large_image/${user.id}.jpg`}
                             alt={user.name}
+                            width={150}
+                            height={150}
                             className="mx-auto mb-4 rounded-full object-cover"
                             style={{
-                                width: '150px',
-                                height: '150px',
                                 border: '3px solid #C6A869',
                                 padding: '3px',
                                 background: '#FFF8E7'
