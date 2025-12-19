@@ -11,7 +11,7 @@ import { ClientHeader } from '@/components/ClientHeader';
 
 export default function ExpensesPage() {
     const [expenses, setExpenses] = useState<Expense[]>([]);
-    const [stats, setStats] = useState({ totalAmount: 0, totalTransactions: 0, totalCategories: 0 });
+    const [stats, setStats] = useState<{ totalAmount: number; totalTransactions: number; totalCategories: number } | null>(null);
     const [categories, setCategories] = useState<string[]>(['All']);
     const [search, setSearch] = useState('');
     const [category, setCategory] = useState('All');
@@ -73,27 +73,47 @@ export default function ExpensesPage() {
                         className="rounded-[10px] p-4 flex flex-wrap gap-4 justify-around"
                         style={{ background: '#E5D3AA' }}
                     >
-                        <div className="flex flex-col items-center">
-                            <IndianRupee className="h-5 w-5 mb-1" style={{ color: '#dc2626' }} />
-                            <div className="text-xl font-bold text-red-600">
-                                ₹{formatIndianCurrency(stats.totalAmount)}
-                            </div>
-                            <div className="text-xs" style={{ color: '#4A3728' }}>Total Expense</div>
-                        </div>
-                        <div className="flex flex-col items-center">
-                            <Receipt className="h-5 w-5 mb-1" style={{ color: '#0D483B' }} />
-                            <div className="text-xl font-bold" style={{ color: '#0D483B' }}>
-                                {stats.totalTransactions}
-                            </div>
-                            <div className="text-xs" style={{ color: '#4A3728' }}>Transactions</div>
-                        </div>
-                        <div className="flex flex-col items-center">
-                            <Tags className="h-5 w-5 mb-1" style={{ color: '#0D483B' }} />
-                            <div className="text-xl font-bold" style={{ color: '#0D483B' }}>
-                                {stats.totalCategories}
-                            </div>
-                            <div className="text-xs" style={{ color: '#4A3728' }}>Categories</div>
-                        </div>
+                        {stats ? (
+                            <>
+                                <div className="flex flex-col items-center">
+                                    <IndianRupee className="h-5 w-5 mb-1" style={{ color: '#dc2626' }} />
+                                    <div className="text-xl font-bold text-red-600">
+                                        ₹{formatIndianCurrency(stats.totalAmount)}
+                                    </div>
+                                    <div className="text-xs" style={{ color: '#4A3728' }}>Total Expense</div>
+                                </div>
+                                <div className="flex flex-col items-center">
+                                    <Receipt className="h-5 w-5 mb-1" style={{ color: '#0D483B' }} />
+                                    <div className="text-xl font-bold" style={{ color: '#0D483B' }}>
+                                        {stats.totalTransactions}
+                                    </div>
+                                    <div className="text-xs" style={{ color: '#4A3728' }}>Transactions</div>
+                                </div>
+                                <div className="flex flex-col items-center">
+                                    <Tags className="h-5 w-5 mb-1" style={{ color: '#0D483B' }} />
+                                    <div className="text-xl font-bold" style={{ color: '#0D483B' }}>
+                                        {stats.totalCategories}
+                                    </div>
+                                    <div className="text-xs" style={{ color: '#4A3728' }}>Categories</div>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                {[1, 2, 3].map(i => (
+                                    <div key={i} className="flex flex-col items-center gap-2">
+                                        <div className="h-5 w-5 rounded-full" style={{ background: 'rgba(198, 168, 105, 0.2)' }} />
+                                        <div className="h-6 w-16 rounded relative overflow-hidden" style={{ background: 'rgba(198, 168, 105, 0.15)' }}>
+                                            <div className="absolute inset-0" style={{
+                                                background: 'linear-gradient(90deg, transparent, rgba(198, 168, 105, 0.3), transparent)',
+                                                backgroundSize: '200% 100%',
+                                                animation: 'shimmer 1.5s infinite linear'
+                                            }} />
+                                        </div>
+                                        <div className="h-3 w-12 rounded" style={{ background: 'rgba(198, 168, 105, 0.1)' }} />
+                                    </div>
+                                ))}
+                            </>
+                        )}
                     </div>
                 </div>
 

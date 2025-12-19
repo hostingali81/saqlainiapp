@@ -16,7 +16,7 @@ import {
 
 export default function ChandaPage() {
     const [groups, setGroups] = useState<ChandaGroup[]>([]);
-    const [stats, setStats] = useState<ChandaStats>({ totalAmount: 0, totalDonations: 0, avgAmount: 0, maxAmount: 0 });
+    const [stats, setStats] = useState<ChandaStats | null>(null);
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(true);
 
@@ -66,34 +66,54 @@ export default function ChandaPage() {
                         className="rounded-[10px] p-4 flex flex-wrap gap-4 justify-around"
                         style={{ background: '#E5D3AA' }}
                     >
-                        <div className="flex flex-col items-center">
-                            <IndianRupee className="h-5 w-5 mb-1" style={{ color: '#0D483B' }} />
-                            <div className="text-xl font-bold" style={{ color: '#0D483B' }}>
-                                ₹{formatIndianCurrency(stats.totalAmount)}
-                            </div>
-                            <div className="text-xs" style={{ color: '#4A3728' }}>Total Amount</div>
-                        </div>
-                        <div className="flex flex-col items-center">
-                            <Users className="h-5 w-5 mb-1" style={{ color: '#0D483B' }} />
-                            <div className="text-xl font-bold" style={{ color: '#0D483B' }}>
-                                {stats.totalDonations}
-                            </div>
-                            <div className="text-xs" style={{ color: '#4A3728' }}>Donations</div>
-                        </div>
-                        <div className="flex flex-col items-center">
-                            <ChartLine className="h-5 w-5 mb-1" style={{ color: '#0D483B' }} />
-                            <div className="text-xl font-bold" style={{ color: '#0D483B' }}>
-                                ₹{formatIndianCurrency(Math.round(stats.avgAmount))}
-                            </div>
-                            <div className="text-xs" style={{ color: '#4A3728' }}>Average</div>
-                        </div>
-                        <div className="flex flex-col items-center">
-                            <Star className="h-5 w-5 mb-1" style={{ color: '#C6A869' }} />
-                            <div className="text-xl font-bold" style={{ color: '#0D483B' }}>
-                                ₹{formatIndianCurrency(stats.maxAmount)}
-                            </div>
-                            <div className="text-xs" style={{ color: '#4A3728' }}>Highest</div>
-                        </div>
+                        {stats ? (
+                            <>
+                                <div className="flex flex-col items-center">
+                                    <IndianRupee className="h-5 w-5 mb-1" style={{ color: '#0D483B' }} />
+                                    <div className="text-xl font-bold" style={{ color: '#0D483B' }}>
+                                        ₹{formatIndianCurrency(stats.totalAmount)}
+                                    </div>
+                                    <div className="text-xs" style={{ color: '#4A3728' }}>Total Amount</div>
+                                </div>
+                                <div className="flex flex-col items-center">
+                                    <Users className="h-5 w-5 mb-1" style={{ color: '#0D483B' }} />
+                                    <div className="text-xl font-bold" style={{ color: '#0D483B' }}>
+                                        {stats.totalDonations}
+                                    </div>
+                                    <div className="text-xs" style={{ color: '#4A3728' }}>Donations</div>
+                                </div>
+                                <div className="flex flex-col items-center">
+                                    <ChartLine className="h-5 w-5 mb-1" style={{ color: '#0D483B' }} />
+                                    <div className="text-xl font-bold" style={{ color: '#0D483B' }}>
+                                        ₹{formatIndianCurrency(Math.round(stats.avgAmount))}
+                                    </div>
+                                    <div className="text-xs" style={{ color: '#4A3728' }}>Average</div>
+                                </div>
+                                <div className="flex flex-col items-center">
+                                    <Star className="h-5 w-5 mb-1" style={{ color: '#C6A869' }} />
+                                    <div className="text-xl font-bold" style={{ color: '#0D483B' }}>
+                                        ₹{formatIndianCurrency(stats.maxAmount)}
+                                    </div>
+                                    <div className="text-xs" style={{ color: '#4A3728' }}>Highest</div>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                {[1, 2, 3, 4].map(i => (
+                                    <div key={i} className="flex flex-col items-center gap-2">
+                                        <div className="h-5 w-5 rounded-full" style={{ background: 'rgba(198, 168, 105, 0.2)' }} />
+                                        <div className="h-6 w-16 rounded relative overflow-hidden" style={{ background: 'rgba(198, 168, 105, 0.15)' }}>
+                                            <div className="absolute inset-0" style={{
+                                                background: 'linear-gradient(90deg, transparent, rgba(198, 168, 105, 0.3), transparent)',
+                                                backgroundSize: '200% 100%',
+                                                animation: 'shimmer 1.5s infinite linear'
+                                            }} />
+                                        </div>
+                                        <div className="h-3 w-12 rounded" style={{ background: 'rgba(198, 168, 105, 0.1)' }} />
+                                    </div>
+                                ))}
+                            </>
+                        )}
                     </div>
                 </div>
 
@@ -173,17 +193,17 @@ export default function ChandaPage() {
                                                                 <TooltipTrigger>
                                                                     <Info className="h-4 w-4 cursor-pointer" style={{ color: '#0D483B' }} />
                                                                 </TooltipTrigger>
-                                                                <TooltipContent className="max-w-[280px] p-3">
-                                                                    <div className="space-y-2">
-                                                                        <p className="font-bold border-b pb-1 mb-2">History ({group.count})</p>
+                                                                <TooltipContent className="max-w-[320px] p-4">
+                                                                    <div className="space-y-3">
+                                                                        <p className="font-bold border-b pb-2 mb-2 text-sm">History ({group.count})</p>
                                                                         {group.donations.map((d, i) => (
-                                                                            <div key={i} className="text-xs space-y-1">
-                                                                                <div className="flex justify-between font-medium">
-                                                                                    <span>₹{formatIndianCurrency(d.Amount)}</span>
-                                                                                    <span className="text-muted-foreground">{d.Date}</span>
+                                                                            <div key={i} className="text-xs space-y-1.5 pb-2 border-b border-dashed last:border-0">
+                                                                                <div className="flex justify-between items-center gap-4 font-medium">
+                                                                                    <span className="font-bold text-sm">₹{formatIndianCurrency(d.Amount)}</span>
+                                                                                    <span className="text-muted-foreground text-[11px] whitespace-nowrap">{d.Date}</span>
                                                                                 </div>
                                                                                 {d.Remarks && (
-                                                                                    <div className="text-muted-foreground italic text-[11px] border-t pt-1 border-dashed">
+                                                                                    <div className="text-muted-foreground italic text-[11px] pt-1">
                                                                                         {d.Remarks}
                                                                                     </div>
                                                                                 )}
