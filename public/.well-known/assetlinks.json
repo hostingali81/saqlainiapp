@@ -1,0 +1,12 @@
+
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "app.saqlainiapp",
+      "sha256_cert_fingerprints":
+        ["1A:F9:38:F9:89:0D:BA:FD:71:59:D3:19:6E:F5:C0:04:93:92:85:94:54:FB:9F:85:A4:8E:C0:87:81:F3:81:52", "37:1D:71:48:F9:56:25:4B:49:7F:95:F3:10:95:92:70:84:C4:A8:AB:36:BE:BF:31:0B:F0:1B:98:7E:F2:5E:E4", "B7:0A:DA:46:9F:97:6C:8C:BC:89:A3:C7:6E:60:CC:BB:3E:70:06:C2:31:D3:0B:CC:3E:DB:67:23:93:5A:28:26"]
+    }
+  }
+]
