@@ -8,6 +8,8 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { Camera } from 'lucide-react';
 
+export const revalidate = 0;
+
 export default async function AdminPage() {
     const supabase = await createClient();
 

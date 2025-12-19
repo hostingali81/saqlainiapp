@@ -8,6 +8,8 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 
+export const revalidate = 0;
+
 export default async function PhotosPage() {
     const supabase = await createClient();
 

@@ -85,30 +85,13 @@ export function ImageModal({ isOpen, onClose, imageUrl, userName }: ImageModalPr
                         `
                     }}
                 >
-                    {/* Skeleton Loader with glass */}
-                    {isLoading && !hasError && (
-                        <div
-                            className="absolute inset-2 flex items-center justify-center rounded-xl animate-pulse"
-                            style={{
-                                background: 'rgba(255, 248, 231, 0.3)',
-                                backdropFilter: 'blur(10px)'
-                            }}
-                        >
-                            <div className="text-center" style={{ color: '#FFF8E7' }}>
-                                <div className="animate-spin rounded-full h-12 w-12 border-4 border-[#C6A869] border-t-transparent mx-auto mb-3"></div>
-                                <p className="text-sm">Loading...</p>
-                            </div>
-                        </div>
-                    )}
-
                     {/* Actual Image with golden glow */}
                     <img
                         src={imageUrl}
                         alt={userName}
-                        className={`w-full h-auto rounded-xl object-contain max-h-[80vh] ${isLoading ? 'opacity-0' : 'opacity-100'
-                            } transition-opacity duration-500`}
+                        className="w-full h-auto rounded-xl object-contain max-h-[80vh] transition-opacity duration-300"
                         style={{
-                            boxShadow: isLoading ? 'none' : '0 0 50px rgba(198, 168, 105, 0.4)'
+                            boxShadow: '0 0 50px rgba(198, 168, 105, 0.4)'
                         }}
                         onLoad={() => setIsLoading(false)}
                         onError={() => {

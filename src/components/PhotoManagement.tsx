@@ -85,6 +85,7 @@ export function PhotoManagement({ users }: PhotoManagementProps) {
                                         src={currentImageUrl}
                                         alt={selectedUser.name}
                                         className="w-40 h-40 rounded-full object-cover border-4 border-gray-200"
+                                        loading="eager"
                                     />
                                 </div>
                                 <p className="text-sm text-muted-foreground mt-2">

@@ -49,6 +49,7 @@ export function UserCard({ user, style }: UserCardProps) {
                                     src={`/upload/small_image/${user.id}.jpg`}
                                     alt={user.name}
                                     className="h-[50px] w-[50px] rounded-full object-cover glass-avatar"
+                                    loading="lazy"
                                 />
                             ) : (
                                 <Avatar className="h-[50px] w-[50px] glass-avatar">

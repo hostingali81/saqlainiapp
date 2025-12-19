@@ -3,6 +3,8 @@ import { UserList } from '@/components/UserList';
 import { Header } from '@/components/Header';
 import { User } from '@/types';
 
+export const revalidate = 60;
+
 export default async function Home() {
   const supabase = await createClient();
 
