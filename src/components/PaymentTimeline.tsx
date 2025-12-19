@@ -1,0 +1,83 @@
+import { MonthStatus } from '@/types';
+import { cn } from '@/lib/utils';
+
+interface PaymentTimelineProps {
+    history: MonthStatus[];
+    frequency?: string;
+}
+
+export function PaymentTimeline({ history, frequency }: PaymentTimelineProps) {
+    // Filter history based on frequency (Match PHP Logic)
+    const filteredHistory = history.filter(item => {
+        if ((frequency === 'Not Regular' || frequency === 'One Time') && item.status === 'due') return false;
+        return true;
+    });
+
+    return (
+        <div>
+            {filteredHistory.map((item, idx, arr) => (
+                <div
+                    key={`${item.year}-${item.month}`}
+                    className={cn(
+                        "flex items-center justify-between p-3 transition-colors",
+                        item.status === 'paid' ? "bg-[#f5fff5]" : "bg-[#fff5f5]"
+                    )}
+                    style={{
+                        borderBottom: idx < arr.length - 1 ? '1px solid #E5D3AA' : 'none'
+                    }}
+                >
+                    {/* Date with Icon */}
+                    <div className="flex items-center gap-3">
+                        {/* Calendar Icon - Simple */}
+                        <div className="h-8 w-8 flex items-center justify-center">
+                            <svg
+                                className="h-6 w-6"
+                                fill={item.status === 'paid' ? '#0D483B' : '#dc2626'}
+                                viewBox="0 0 24 24"
+                            >
+                                <path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zM9 14H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2zm-8 4H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2z" />
+                            </svg>
+                        </div>
+                        <span
+                            className="font-medium"
+                            style={{ color: '#165E4B' }}
+                        >
+                            {item.monthName} {item.year}
+                        </span>
+                    </div>
+
+                    {/* Amount/Status */}
+                    <div>
+                        {item.status === 'paid' ? (
+                            <span
+                                className="font-bold text-base"
+                                style={{ color: '#0D483B' }}
+                            >
+                                ₹{item.amount}
+                            </span>
+                        ) : (
+                            <span
+                                className="font-bold text-xs px-3 py-1 rounded-[12px]"
+                                style={{
+                                    background: '#f8d7da',
+                                    color: '#dc2626'
+                                }}
+                            >
+                                DUE
+                            </span>
+                        )}
+                    </div>
+                </div>
+            ))}
+
+            {filteredHistory.length === 0 && (
+                <div
+                    className="text-center p-6"
+                    style={{ color: '#165E4B' }}
+                >
+                    No payment history to show.
+                </div>
+            )}
+        </div>
+    );
+}

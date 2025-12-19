@@ -1,0 +1,59 @@
+export interface User {
+    id: number;
+    name: string;
+    fname: string; // Father's Name
+    phone: string;
+    bakaya_month: number; // Initial due months
+    frequency: 'Regular' | 'One Time';
+    amount: number; // Monthly amount (usually 125)
+    first_payment_year?: number;
+    first_payment_month?: number;
+    hasImage?: boolean; // True if local image exists in public/upload/small_image
+}
+
+export interface Payment {
+    id?: number;
+    user_id: number;
+    month: number;
+    year: number;
+    amount: number;
+    date?: string;
+}
+
+export interface MonthStatus {
+    year: number;
+    month: number;
+    monthName: string;
+    amount: number;
+    status: 'paid' | 'due';
+    isPartial?: boolean;
+}
+
+export interface UserFinancialSummary {
+    totalPaid: number;
+    paidMonthsCount: number;
+    dueMonthsCount: number;
+    minDueAmount: number;
+    avgMonthlyPayment: number;
+    history: MonthStatus[];
+}
+
+export interface Expense {
+    id: number;
+    PaymentDate: string; // Changed from Date to match DB column name
+    Details: string;
+    Category?: string; // Added Category
+    Amount: number;
+    Remarks?: string;
+}
+
+export interface ChandaEntry {
+    id: number;
+    ChandaID?: number; // Alias for id
+    Name: string;
+    hindi_name?: string;
+    NameHindi?: string; // Alias for hindi_name
+    Amount: number;
+    Date: string;
+    Remarks?: string;
+}
