@@ -1,6 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
 import { SmartEntryForm } from '@/components/SmartEntryForm';
-import { Header } from '@/components/Header';
 import { Button } from '@/components/ui/button';
 import { User } from '@/types';
 import { cookies } from 'next/headers';
@@ -53,30 +52,24 @@ export default async function AdminPage() {
         hasImage: imageSet.has(`${user.id}.jpg`)
     }));
 
-    // Calculate total for header
-    const totalAmount = await supabase.rpc('get_total_payment_amount').then(r => r.data || 0);
-
     return (
-        <>
-            <Header totalAmount={totalAmount} />
-            <main className="container max-w-md mx-auto p-4 min-h-screen bg-background pb-24">
-                <div className="flex items-center justify-between mb-6">
-                    <h1 className="text-2xl font-bold text-primary font-serif">Admin Dashboard</h1>
-                    <div className="flex gap-2">
-                        <Link href="/admin/photos">
-                            <Button variant="outline" size="sm">
-                                <Camera className="h-4 w-4 mr-2" />
-                                Photos
-                            </Button>
-                        </Link>
-                        <form action="/api/admin-logout" method="POST">
-                            <Button type="submit" variant="outline" size="sm">Logout</Button>
-                        </form>
-                    </div>
+        <main className="container max-w-md mx-auto p-4 min-h-screen bg-background pb-24">
+            <div className="flex items-center justify-between mb-6">
+                <h1 className="text-2xl font-bold text-primary font-serif">Admin Dashboard</h1>
+                <div className="flex gap-2">
+                    <Link href="/admin/photos">
+                        <Button variant="outline" size="sm">
+                            <Camera className="h-4 w-4 mr-2" />
+                            Photos
+                        </Button>
+                    </Link>
+                    <form action="/api/admin-logout" method="POST">
+                        <Button type="submit" variant="outline" size="sm">Logout</Button>
+                    </form>
                 </div>
+            </div>
 
-                <SmartEntryForm users={usersWithImages} />
-            </main>
-        </>
+            <SmartEntryForm users={usersWithImages} />
+        </main>
     );
 }

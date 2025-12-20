@@ -1,12 +1,23 @@
+'use client';
+
 import Link from 'next/link';
 import Image from 'next/image';
 import { formatIndianCurrency } from '@/lib/utils';
+import { useEffect, useState } from 'react';
+import { createClient } from '@/lib/supabase/client';
 
-interface HeaderProps {
-    totalAmount: number | null;
-}
+export function Header() {
+    const [totalAmount, setTotalAmount] = useState<number | null>(null);
 
-export function Header({ totalAmount }: HeaderProps) {
+    useEffect(() => {
+        async function fetchTotal() {
+            const supabase = createClient();
+            const { data } = await supabase.rpc('get_total_payment_amount');
+            setTotalAmount(data || 0);
+        }
+        fetchTotal();
+    }, []);
+
     const formattedAmount = totalAmount !== null ? formatIndianCurrency(totalAmount) : null;
 
     return (

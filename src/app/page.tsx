@@ -1,6 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
 import { UserList } from '@/components/UserList';
-import { Header } from '@/components/Header';
 import { User } from '@/types';
 import { readdirSync } from 'fs';
 import { join } from 'path';
@@ -48,11 +47,8 @@ export default async function Home() {
   const totalAmount = totalResult.data || 0;
 
   return (
-    <>
-      <Header totalAmount={totalAmount} />
-      <main className="container max-w-md mx-auto p-4 h-screen flex flex-col bg-background">
-        <UserList initialUsers={usersWithImages} />
-      </main>
-    </>
+    <main className="container max-w-md mx-auto p-4 h-screen flex flex-col bg-background">
+      <UserList initialUsers={usersWithImages} />
+    </main>
   );
 }

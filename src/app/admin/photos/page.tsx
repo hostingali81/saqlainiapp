@@ -1,6 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
 import { PhotoManagement } from '@/components/PhotoManagement';
-import { Header } from '@/components/Header';
 import { Button } from '@/components/ui/button';
 import { User } from '@/types';
 import { cookies } from 'next/headers';
@@ -62,29 +61,23 @@ export default async function PhotosPage() {
         hasImage: imageSet.has(`${user.id}.jpg`)
     }));
 
-    // Calculate total for header
-    const totalAmount = await supabase.rpc('get_total_payment_amount').then(r => r.data || 0);
-
     return (
-        <>
-            <Header totalAmount={totalAmount} />
-            <main className="container max-w-lg mx-auto p-4 min-h-screen bg-background pb-24">
-                <div className="flex items-center justify-between mb-6">
-                    <div className="flex items-center gap-3">
-                        <Link href="/admin">
-                            <Button variant="outline" size="icon">
-                                <ArrowLeft className="h-4 w-4" />
-                            </Button>
-                        </Link>
-                        <h1 className="text-2xl font-bold text-primary font-serif">Photo Management</h1>
-                    </div>
-                    <form action="/api/admin-logout" method="POST">
-                        <Button type="submit" variant="outline" size="sm">Logout</Button>
-                    </form>
+        <main className="container max-w-lg mx-auto p-4 min-h-screen bg-background pb-24">
+            <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                    <Link href="/admin">
+                        <Button variant="outline" size="icon">
+                            <ArrowLeft className="h-4 w-4" />
+                        </Button>
+                    </Link>
+                    <h1 className="text-2xl font-bold text-primary font-serif">Photo Management</h1>
                 </div>
+                <form action="/api/admin-logout" method="POST">
+                    <Button type="submit" variant="outline" size="sm">Logout</Button>
+                </form>
+            </div>
 
-                <PhotoManagement users={usersWithImages} />
-            </main>
-        </>
+            <PhotoManagement users={usersWithImages} />
+        </main>
     );
 }

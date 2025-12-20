@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Amiri } from "next/font/google";
 import "./globals.css";
 import { BottomNav } from "@/components/BottomNav";
+import { Header } from "@/components/Header";
 
 const amiri = Amiri({
   weight: ['400', '700'],
@@ -62,6 +63,7 @@ export default function RootLayout({
       <body
         className={`${amiri.variable} font-sans antialiased`}
       >
+        <Header />
         {children}
         <BottomNav />
         <script
