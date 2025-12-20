@@ -2,11 +2,8 @@ import { createClient } from '@/lib/supabase/server';
 import { SmartEntryForm } from '@/components/SmartEntryForm';
 import { Button } from '@/components/ui/button';
 import { User } from '@/types';
-import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { Camera } from 'lucide-react';
-import { getProfileImages } from '@/lib/image-loader';
 import { LogoutButton } from '@/components/LogoutButton';
 
 export const revalidate = 0;
@@ -14,43 +11,6 @@ export const revalidate = 0;
 export default async function AdminPage() {
     const supabase = await createClient();
 
-    // Check authentication
-    const cookieStore = await cookies();
-    const adminAuth = cookieStore.get('admin_auth')?.value;
-
-    if (!adminAuth) {
-        redirect('/admin/login');
-    }
-
-    // Verify credentials from database
-    try {
-        // Parse JSON cookie
-        const auth = JSON.parse(adminAuth);
-        const username = auth.u;
-        const password = auth.p;
-
-        if (!username || !password) {
-            cookieStore.delete('admin_auth');
-            redirect('/admin/login');
-        }
-
-        const { data: loginData } = await supabase
-            .from('login')
-            .select('*')
-            .eq('username', username)
-            .eq('password', password)
-            .single();
-
-        if (!loginData) {
-            cookieStore.delete('admin_auth');
-            redirect('/admin/login');
-        }
-    } catch (error) {
-        cookieStore.delete('admin_auth');
-        redirect('/admin/login');
-    }
-
-    // Fetch all users for the dropdown
     const { data: users, error } = await supabase
         .from('user_list')
         .select('*')
@@ -60,12 +20,9 @@ export default async function AdminPage() {
         return <div>Error loading users.</div>;
     }
 
-    // Optimized: Read image directory once (cached)
-    const imageSet = await getProfileImages();
-
     const usersWithImages = (users as User[]).map(user => ({
         ...user,
-        hasImage: imageSet.has(`${user.id}.jpg`)
+        hasImage: false
     }));
 
     return (

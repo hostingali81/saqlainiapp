@@ -2,8 +2,6 @@ import { createClient } from '@/lib/supabase/server';
 import { PhotoManagement } from '@/components/PhotoManagement';
 import { Button } from '@/components/ui/button';
 import { User } from '@/types';
-import { cookies } from 'next/headers';
-import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { LogoutButton } from '@/components/LogoutButton';
@@ -13,43 +11,6 @@ export const revalidate = 0;
 export default async function PhotosPage() {
     const supabase = await createClient();
 
-    // Check authentication (same as admin page)
-    const cookieStore = await cookies();
-    const adminAuth = cookieStore.get('admin_auth')?.value;
-
-    if (!adminAuth) {
-        redirect('/admin/login');
-    }
-
-    // Verify credentials from database
-    try {
-        // Parse JSON cookie
-        const auth = JSON.parse(adminAuth);
-        const username = auth.u;
-        const password = auth.p;
-
-        if (!username || !password) {
-            cookieStore.delete('admin_auth');
-            redirect('/admin/login');
-        }
-
-        const { data: loginData } = await supabase
-            .from('login')
-            .select('*')
-            .eq('username', username)
-            .eq('password', password)
-            .single();
-
-        if (!loginData) {
-            cookieStore.delete('admin_auth');
-            redirect('/admin/login');
-        }
-    } catch (error) {
-        cookieStore.delete('admin_auth');
-        redirect('/admin/login');
-    }
-
-    // Fetch all users
     const { data: users, error } = await supabase
         .from('user_list')
         .select('*')
@@ -59,22 +20,9 @@ export default async function PhotosPage() {
         return <div>Error loading users.</div>;
     }
 
-    // Optimized: Read image directory once
-    const fs = require('fs');
-    const path = require('path');
-
-    let imageSet: Set<string>;
-    try {
-        const imagePath = path.join(process.cwd(), 'public', 'upload', 'small_image');
-        const imageFiles = fs.readdirSync(imagePath);
-        imageSet = new Set(imageFiles);
-    } catch {
-        imageSet = new Set();
-    }
-
     const usersWithImages = (users as User[]).map(user => ({
         ...user,
-        hasImage: imageSet.has(`${user.id}.jpg`)
+        hasImage: false
     }));
 
     return (

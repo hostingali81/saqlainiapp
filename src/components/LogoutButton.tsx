@@ -11,7 +11,7 @@ export function LogoutButton({ variant = "outline", size = "sm" }: { variant?: a
     const handleLogout = async () => {
         setLoading(true);
         try {
-            await fetch('/api/admin-logout', { method: 'POST' });
+            await fetch('/api/admin-clear', { method: 'POST' });
             router.push('/admin/login');
             router.refresh();
         } catch (error) {

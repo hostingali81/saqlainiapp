@@ -1,9 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { UserList } from '@/components/UserList';
 import { User } from '@/types';
-import { readdirSync } from 'fs';
-import { join } from 'path';
-import { getProfileImages } from '@/lib/image-loader';
 
 export const revalidate = 60;
 
@@ -36,12 +33,9 @@ export default async function Home() {
     return 0;
   });
 
-  // Optimized: Read image directory once (cached)
-  const imageSet = await getProfileImages();
-
   const usersWithImages = sortedUsers.map(user => ({
     ...user,
-    hasImage: imageSet.has(`${user.id}.jpg`)
+    hasImage: false // Will be checked client-side via image onError
   }));
 
   const totalAmount = totalResult.data || 0;
