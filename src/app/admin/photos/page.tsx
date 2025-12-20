@@ -6,6 +6,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
+import { LogoutButton } from '@/components/LogoutButton';
 
 export const revalidate = 0;
 
@@ -72,9 +73,7 @@ export default async function PhotosPage() {
                     </Link>
                     <h1 className="text-2xl font-bold text-primary font-serif">Photo Management</h1>
                 </div>
-                <form action="/api/admin-logout" method="POST">
-                    <Button type="submit" variant="outline" size="sm">Logout</Button>
-                </form>
+                <LogoutButton variant="outline" size="sm" />
             </div>
 
             <PhotoManagement users={usersWithImages} />

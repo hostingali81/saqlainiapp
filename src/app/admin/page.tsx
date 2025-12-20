@@ -7,6 +7,7 @@ import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { Camera } from 'lucide-react';
 import { getProfileImages } from '@/lib/image-loader';
+import { LogoutButton } from '@/components/LogoutButton';
 
 export const revalidate = 0;
 
@@ -63,9 +64,7 @@ export default async function AdminPage() {
                             Photos
                         </Button>
                     </Link>
-                    <form action="/api/admin-logout" method="POST">
-                        <Button type="submit" variant="outline" size="sm">Logout</Button>
-                    </form>
+                    <LogoutButton variant="outline" size="sm" />
                 </div>
             </div>
 
