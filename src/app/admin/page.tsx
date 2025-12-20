@@ -7,6 +7,7 @@ import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { Camera } from 'lucide-react';
+import { getProfileImages } from '@/lib/image-loader';
 
 export const revalidate = 0;
 
@@ -44,21 +45,16 @@ export default async function AdminPage() {
         return <div>Error loading users.</div>;
     }
 
-    // Check for profile images (same logic as homepage)
-    const fs = require('fs');
-    const path = require('path');
+    // Optimized: Read image directory once (cached)
+    const imageSet = await getProfileImages();
 
-    const usersWithImages = (users as User[]).map(user => {
-        const imagePath = path.join(process.cwd(), 'public', 'upload', 'small_image', `${user.id}.jpg`);
-        return {
-            ...user,
-            hasImage: fs.existsSync(imagePath)
-        };
-    });
+    const usersWithImages = (users as User[]).map(user => ({
+        ...user,
+        hasImage: imageSet.has(`${user.id}.jpg`)
+    }));
 
     // Calculate total for header
-    const { data: totalData } = await supabase.from('payment').select('amount');
-    const totalAmount = totalData?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
+    const totalAmount = await supabase.rpc('get_total_payment_amount').then(r => r.data || 0);
 
     return (
         <>

@@ -155,9 +155,57 @@ export default function ChandaPage() {
                             </thead>
                             <tbody>
                                 {loading ? (
-                                    <tr>
-                                        <td colSpan={5} className="text-center py-8" style={{ color: '#165E4B' }}>Loading...</td>
-                                    </tr>
+                                    <>
+                                        {[1, 2, 3, 4, 5].map(i => (
+                                            <tr key={i} style={{ borderBottom: '1px solid #E5D3AA' }}>
+                                                <td className="p-3">
+                                                    <div className="h-3 w-6 rounded relative overflow-hidden" style={{ background: 'rgba(198, 168, 105, 0.15)' }}>
+                                                        <div className="absolute inset-0" style={{
+                                                            background: 'linear-gradient(90deg, transparent, rgba(198, 168, 105, 0.3), transparent)',
+                                                            backgroundSize: '200% 100%',
+                                                            animation: 'shimmer 1.5s infinite linear'
+                                                        }} />
+                                                    </div>
+                                                </td>
+                                                <td className="p-3">
+                                                    <div className="h-4 w-32 rounded relative overflow-hidden" style={{ background: 'rgba(198, 168, 105, 0.15)' }}>
+                                                        <div className="absolute inset-0" style={{
+                                                            background: 'linear-gradient(90deg, transparent, rgba(198, 168, 105, 0.3), transparent)',
+                                                            backgroundSize: '200% 100%',
+                                                            animation: 'shimmer 1.5s infinite linear'
+                                                        }} />
+                                                    </div>
+                                                </td>
+                                                <td className="p-3">
+                                                    <div className="h-4 w-20 rounded relative overflow-hidden" style={{ background: 'rgba(198, 168, 105, 0.15)' }}>
+                                                        <div className="absolute inset-0" style={{
+                                                            background: 'linear-gradient(90deg, transparent, rgba(198, 168, 105, 0.3), transparent)',
+                                                            backgroundSize: '200% 100%',
+                                                            animation: 'shimmer 1.5s infinite linear'
+                                                        }} />
+                                                    </div>
+                                                </td>
+                                                <td className="p-3">
+                                                    <div className="h-3 w-16 rounded relative overflow-hidden" style={{ background: 'rgba(198, 168, 105, 0.1)' }}>
+                                                        <div className="absolute inset-0" style={{
+                                                            background: 'linear-gradient(90deg, transparent, rgba(198, 168, 105, 0.3), transparent)',
+                                                            backgroundSize: '200% 100%',
+                                                            animation: 'shimmer 1.5s infinite linear'
+                                                        }} />
+                                                    </div>
+                                                </td>
+                                                <td className="p-3">
+                                                    <div className="h-3 w-24 rounded relative overflow-hidden" style={{ background: 'rgba(198, 168, 105, 0.1)' }}>
+                                                        <div className="absolute inset-0" style={{
+                                                            background: 'linear-gradient(90deg, transparent, rgba(198, 168, 105, 0.3), transparent)',
+                                                            backgroundSize: '200% 100%',
+                                                            animation: 'shimmer 1.5s infinite linear'
+                                                        }} />
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </>
                                 ) : groups.length === 0 ? (
                                     <tr>
                                         <td colSpan={5} className="text-center py-8" style={{ color: '#165E4B' }}>No records found.</td>

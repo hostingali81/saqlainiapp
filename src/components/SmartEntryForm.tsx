@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { processSmartPayment } from '@/app/actions/user';
-import { Check, Loader2 } from 'lucide-react';
+import { Check } from 'lucide-react';
 
 interface SmartEntryFormProps {
     users: User[];
@@ -102,8 +102,12 @@ export function SmartEntryForm({ users }: SmartEntryFormProps) {
                     disabled={!selectedUserId || !amount || loading}
                     onClick={handlePayment}
                 >
-                    {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
-                    {loading ? 'Processing...' : 'Auto-Allocate Payment'}
+                    {loading ? 'Processing...' : (
+                        <>
+                            <Check className="mr-2 h-4 w-4" />
+                            Auto-Allocate Payment
+                        </>
+                    )}
                 </Button>
 
                 {/* Result */}

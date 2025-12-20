@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { User } from '@/types';
 import { UserCard } from './UserCard';
 import { Input } from '@/components/ui/input';
@@ -10,8 +10,60 @@ interface UserListProps {
     initialUsers: User[];
 }
 
+function UserCardSkeleton() {
+    return (
+        <div className="p-2">
+            <div className="glass-card rounded-[15px] p-4 flex items-center gap-3 relative overflow-hidden">
+                <div className="h-[50px] w-[50px] rounded-full relative overflow-hidden" style={{ background: 'rgba(198, 168, 105, 0.15)' }}>
+                    <div className="absolute inset-0" style={{
+                        background: 'linear-gradient(90deg, transparent, rgba(198, 168, 105, 0.3), transparent)',
+                        backgroundSize: '200% 100%',
+                        animation: 'shimmer 1.5s infinite linear'
+                    }} />
+                </div>
+                <div className="flex-1 space-y-2">
+                    <div className="h-4 w-32 rounded relative overflow-hidden" style={{ background: 'rgba(198, 168, 105, 0.15)' }}>
+                        <div className="absolute inset-0" style={{
+                            background: 'linear-gradient(90deg, transparent, rgba(198, 168, 105, 0.3), transparent)',
+                            backgroundSize: '200% 100%',
+                            animation: 'shimmer 1.5s infinite linear'
+                        }} />
+                    </div>
+                    <div className="h-3 w-24 rounded relative overflow-hidden" style={{ background: 'rgba(198, 168, 105, 0.1)' }}>
+                        <div className="absolute inset-0" style={{
+                            background: 'linear-gradient(90deg, transparent, rgba(198, 168, 105, 0.3), transparent)',
+                            backgroundSize: '200% 100%',
+                            animation: 'shimmer 1.5s infinite linear'
+                        }} />
+                    </div>
+                </div>
+                <div className="h-7 w-12 rounded-full relative overflow-hidden" style={{ background: 'rgba(198, 168, 105, 0.15)' }}>
+                    <div className="absolute inset-0" style={{
+                        background: 'linear-gradient(90deg, transparent, rgba(198, 168, 105, 0.3), transparent)',
+                        backgroundSize: '200% 100%',
+                        animation: 'shimmer 1.5s infinite linear'
+                    }} />
+                </div>
+                <div className="h-[45px] w-[45px] rounded-full relative overflow-hidden" style={{ background: 'rgba(198, 168, 105, 0.15)' }}>
+                    <div className="absolute inset-0" style={{
+                        background: 'linear-gradient(90deg, transparent, rgba(198, 168, 105, 0.3), transparent)',
+                        backgroundSize: '200% 100%',
+                        animation: 'shimmer 1.5s infinite linear'
+                    }} />
+                </div>
+            </div>
+        </div>
+    );
+}
+
 export function UserList({ initialUsers }: UserListProps) {
     const [search, setSearch] = useState('');
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        const timer = setTimeout(() => setIsLoading(false), 100);
+        return () => clearTimeout(timer);
+    }, []);
 
     const filteredUsers = useMemo(() => {
         if (!search) return initialUsers;
@@ -38,14 +90,28 @@ export function UserList({ initialUsers }: UserListProps) {
 
             {/* Stats */}
             <div className="text-sm text-muted-foreground px-1">
-                Showing {filteredUsers.length} members
+                {isLoading ? (
+                    <div className="h-4 w-32 rounded relative overflow-hidden inline-block" style={{ background: 'rgba(198, 168, 105, 0.1)' }}>
+                        <div className="absolute inset-0" style={{
+                            background: 'linear-gradient(90deg, transparent, rgba(198, 168, 105, 0.3), transparent)',
+                            backgroundSize: '200% 100%',
+                            animation: 'shimmer 1.5s infinite linear'
+                        }} />
+                    </div>
+                ) : (
+                    `Showing ${filteredUsers.length} members`
+                )}
             </div>
 
             {/* User List */}
             <div className="flex-1 overflow-y-auto space-y-2 pb-24">
-                {filteredUsers.map((user) => (
-                    <UserCard key={user.id} user={user} />
-                ))}
+                {isLoading ? (
+                    Array.from({ length: 8 }).map((_, i) => <UserCardSkeleton key={i} />)
+                ) : (
+                    filteredUsers.map((user) => (
+                        <UserCard key={user.id} user={user} />
+                    ))
+                )}
             </div>
         </div>
     );

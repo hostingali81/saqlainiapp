@@ -28,16 +28,18 @@ export default async function ProfilePage({ params }: PageProps) {
     const { user, financials } = result;
     if (!user || !financials) notFound();
 
+    // Parallel: Check image + get total amount
     const fs = require('fs');
     const path = require('path');
-    const largeImagePath = path.join(process.cwd(), 'public', 'upload', 'large_image', `${user.id}.jpg`);
-    const hasLargeImage = fs.existsSync(largeImagePath);
-
-    // Calculate total for header
     const { createClient } = await import('@/lib/supabase/server');
     const supabase = await createClient();
-    const { data: totalData } = await supabase.from('payment').select('amount');
-    const totalAmount = totalData?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
+
+    const [hasLargeImage, totalResult] = await Promise.all([
+        Promise.resolve(fs.existsSync(path.join(process.cwd(), 'public', 'upload', 'large_image', `${user.id}.jpg`))),
+        supabase.rpc('get_total_payment_amount')
+    ]);
+
+    const totalAmount = totalResult.data || 0;
 
     return (
         <>

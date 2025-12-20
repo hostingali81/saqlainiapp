@@ -44,21 +44,26 @@ export default async function PhotosPage() {
         return <div>Error loading users.</div>;
     }
 
-    // Check for profile images
+    // Optimized: Read image directory once
     const fs = require('fs');
     const path = require('path');
 
-    const usersWithImages = (users as User[]).map(user => {
-        const imagePath = path.join(process.cwd(), 'public', 'upload', 'small_image', `${user.id}.jpg`);
-        return {
-            ...user,
-            hasImage: fs.existsSync(imagePath)
-        };
-    });
+    let imageSet: Set<string>;
+    try {
+        const imagePath = path.join(process.cwd(), 'public', 'upload', 'small_image');
+        const imageFiles = fs.readdirSync(imagePath);
+        imageSet = new Set(imageFiles);
+    } catch {
+        imageSet = new Set();
+    }
+
+    const usersWithImages = (users as User[]).map(user => ({
+        ...user,
+        hasImage: imageSet.has(`${user.id}.jpg`)
+    }));
 
     // Calculate total for header
-    const { data: totalData } = await supabase.from('payment').select('amount');
-    const totalAmount = totalData?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
+    const totalAmount = await supabase.rpc('get_total_payment_amount').then(r => r.data || 0);
 
     return (
         <>

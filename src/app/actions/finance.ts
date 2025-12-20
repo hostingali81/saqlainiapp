@@ -63,13 +63,49 @@ export interface ChandaStats {
 export async function getChandaEntries(search: string = '') {
     const supabase = await createClient();
 
+    // Use database function for better performance
+    const { data, error } = await supabase.rpc('get_chanda_groups', {
+        search_term: search
+    });
+
+    if (error) {
+        console.error('Error fetching chanda entries:', error);
+        // Fallback to old method if function doesn't exist yet
+        return await getChandaEntriesLegacy(search);
+    }
+
+    // Calculate stats from grouped data
+    const groups: ChandaGroup[] = (data || []).map((item: any) => ({
+        id: item.display_name,
+        name: item.display_name,
+        totalAmount: Number(item.total_amount || 0),
+        count: Number(item.donation_count || 0),
+        latestDate: item.latest_date,
+        latestRemarks: item.latest_remarks || '',
+        donations: item.donations || []
+    }));
+
+    const totalAmount = groups.reduce((sum: number, g: ChandaGroup) => sum + g.totalAmount, 0);
+    const totalDonations = groups.reduce((sum: number, g: ChandaGroup) => sum + g.count, 0);
+    const avgAmount = totalDonations > 0 ? totalAmount / totalDonations : 0;
+    const maxAmount = groups.reduce((max: number, g: ChandaGroup) => Math.max(max, g.totalAmount), 0);
+
+    return {
+        groups,
+        stats: { totalAmount, totalDonations, avgAmount, maxAmount }
+    };
+}
+
+// Legacy fallback method
+async function getChandaEntriesLegacy(search: string = '') {
+    const supabase = await createClient();
+
     let query = supabase
-        .from('db_chanda') // lowercase table name
+        .from('db_chanda')
         .select('*')
-        .order('id', { ascending: false }); // Latest first
+        .order('id', { ascending: false });
 
     if (search) {
-        // Lowercase columns
         query = query.or(`name.ilike.%${search}%,hindi_name.ilike.%${search}%,remarks.ilike.%${search}%`);
     }
 
@@ -80,9 +116,8 @@ export async function getChandaEntries(search: string = '') {
         return { groups: [], stats: { totalAmount: 0, totalDonations: 0, avgAmount: 0, maxAmount: 0 } };
     }
 
-    // Map Raw DB Data (lowercase) to ChandaEntry (PascalCase)
     const entries = (rawData || []).map((item: any) => ({
-        id: item.id, // Required by ChandaEntry
+        id: item.id,
         ChandaID: item.id,
         Name: item.name,
         NameHindi: item.hindi_name,
@@ -92,17 +127,14 @@ export async function getChandaEntries(search: string = '') {
         Remarks: item.remarks
     })) as ChandaEntry[];
 
-    // Calculate Stats
     const totalAmount = entries.reduce((sum, item) => sum + (item.Amount || 0), 0);
     const totalDonations = entries.length;
     const avgAmount = totalDonations > 0 ? totalAmount / totalDonations : 0;
     const maxAmount = entries.reduce((max, item) => Math.max(max, item.Amount || 0), 0);
 
-    // Group by Name
     const groups: { [key: string]: ChandaGroup } = {};
 
     entries.forEach(entry => {
-        // Use Hindi Name if available, else English Name as key
         const displayName = entry.NameHindi || entry.Name || 'N/A';
         const date = entry.Date || 'N/A';
 
@@ -112,7 +144,7 @@ export async function getChandaEntries(search: string = '') {
                 name: displayName,
                 totalAmount: 0,
                 count: 0,
-                latestDate: date, // Since we ordered by ID desc, first one is latest
+                latestDate: date,
                 latestRemarks: entry.Remarks || '',
                 donations: []
             };
@@ -136,49 +168,59 @@ export async function getChandaEntries(search: string = '') {
 export async function getExpensePageStats() {
     const supabase = await createClient();
 
-    // Fetch all expenses to calculate stats (Assuming dataset is manageable < 1000s for now)
-    // For large datasets, use RPC or specific queries.
-    const { data: expenses, error } = await supabase
-        .from('expenses')
-        .select('amount, category');
+    // Use database function for better performance
+    const { data, error } = await supabase.rpc('get_expense_stats');
 
-    if (error) {
+    if (error || !data || data.length === 0) {
         console.error('Error fetching stats:', error);
-        return { totalAmount: 0, totalTransactions: 0, totalCategories: 0 };
+        // Fallback to old method
+        const { data: expenses } = await supabase
+            .from('expenses')
+            .select('amount, category');
+
+        const totalAmount = expenses?.reduce((sum, item) => sum + (item.amount || 0), 0) || 0;
+        const totalTransactions = expenses?.length || 0;
+        const totalCategories = new Set(expenses?.map(e => e.category).filter(Boolean)).size;
+
+        return { totalAmount, totalTransactions, totalCategories };
     }
 
-    const totalAmount = expenses?.reduce((sum, item) => sum + (item.amount || 0), 0) || 0;
-    const totalTransactions = expenses?.length || 0;
-    // Count unique non-null categories
-    const totalCategories = new Set(expenses?.map(e => e.category).filter(Boolean)).size;
-
     return {
-        totalAmount,
-        totalTransactions,
-        totalCategories
+        totalAmount: data[0].total_amount || 0,
+        totalTransactions: Number(data[0].total_transactions) || 0,
+        totalCategories: Number(data[0].total_categories) || 0
     };
 }
 
 export async function getCategories() {
     const supabase = await createClient();
 
-    // Fetch distinct categories
-    // Note: supabase-js doesn't have a direct distinct() with select, 
-    // but we can hack it or use a raw query if needed, or just fetch all 'category' and set() them.
-    // Efficient way: .select('category') and process in JS for now as list is small.
-    // Postgres 'DISTINCT' is supported via modifier? 
-    // .select('category', { head: false, distinct: true }) doesn't exist directly like that.
-    // Conventional way:
-    const { data, error } = await supabase
+    // OPTIMIZED: Use database function to get distinct categories instantly
+    const { data, error } = await supabase.rpc('get_unique_categories');
+
+    if (!error && data && data.length > 0) {
+        // RPC returns array of objects: [{ category: 'Food' }, { category: 'Travel' }]
+        // We need to map it to a string array
+        return data.map((item: any) => item.category).filter(Boolean);
+    }
+
+    if (error) {
+        // Silent fail to console, fallback to old method
+        console.warn('get_unique_categories RPC failed (function might not exist yet), falling back to raw query.', error.message);
+    }
+
+    // FALLBACK: Old method (fetches all expenses)
+    // Useful if the user hasn't run the new SQL migration yet.
+    const { data: rawData, error: rawError } = await supabase
         .from('expenses')
         .select('category');
 
-    if (error) {
-        console.error('Error fetching categories:', error);
+    if (rawError) {
+        console.error('Error fetching categories:', rawError);
         return [];
     }
 
     // Extract unique non-null categories
-    const categories = Array.from(new Set(data.map((item: any) => item.category).filter(Boolean)));
+    const categories = Array.from(new Set(rawData.map((item: any) => item.category).filter(Boolean)));
     return categories.sort();
 }

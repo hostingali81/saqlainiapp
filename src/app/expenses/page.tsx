@@ -173,7 +173,35 @@ export default function ExpensesPage() {
                     </h3>
 
                     {loading ? (
-                        <div className="text-center py-10" style={{ color: '#165E4B' }}>Loading...</div>
+                        <div className="space-y-3">
+                            {[1, 2, 3, 4, 5].map(i => (
+                                <div key={i} className="flex justify-between items-start p-3" style={{ background: 'rgba(248, 215, 218, 0.2)' }}>
+                                    <div className="flex-1 space-y-2">
+                                        <div className="h-4 w-48 rounded relative overflow-hidden" style={{ background: 'rgba(198, 168, 105, 0.15)' }}>
+                                            <div className="absolute inset-0" style={{
+                                                background: 'linear-gradient(90deg, transparent, rgba(198, 168, 105, 0.3), transparent)',
+                                                backgroundSize: '200% 100%',
+                                                animation: 'shimmer 1.5s infinite linear'
+                                            }} />
+                                        </div>
+                                        <div className="h-3 w-32 rounded relative overflow-hidden" style={{ background: 'rgba(198, 168, 105, 0.1)' }}>
+                                            <div className="absolute inset-0" style={{
+                                                background: 'linear-gradient(90deg, transparent, rgba(198, 168, 105, 0.3), transparent)',
+                                                backgroundSize: '200% 100%',
+                                                animation: 'shimmer 1.5s infinite linear'
+                                            }} />
+                                        </div>
+                                    </div>
+                                    <div className="h-6 w-20 rounded relative overflow-hidden" style={{ background: 'rgba(198, 168, 105, 0.15)' }}>
+                                        <div className="absolute inset-0" style={{
+                                            background: 'linear-gradient(90deg, transparent, rgba(198, 168, 105, 0.3), transparent)',
+                                            backgroundSize: '200% 100%',
+                                            animation: 'shimmer 1.5s infinite linear'
+                                        }} />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     ) : expenses.length === 0 ? (
                         <div className="text-center py-10" style={{ color: '#165E4B' }}>No expenses found.</div>
                     ) : (

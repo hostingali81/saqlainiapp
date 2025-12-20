@@ -6,7 +6,7 @@ import { Header } from '@/components/Header';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '../../components/ui/textarea';
-import { Loader2, Mic, Play, Download, Copy, Check, RotateCcw } from 'lucide-react';
+import { Mic, Play, Download, Copy, Check, RotateCcw } from 'lucide-react';
 import { formatIndianCurrency } from '@/lib/utils';
 
 export default function AudioGeneratorPage() {
@@ -262,8 +262,7 @@ export default function AudioGeneratorPage() {
                         className="w-full h-12 text-lg font-bold"
                         style={{ background: '#0D483B' }}
                     >
-                        {loadingScript ? <Loader2 className="animate-spin mr-2" /> : null}
-                        सूची बनाएँ
+                        {loadingScript ? 'बनाया जा रहा है...' : 'सूची बनाएँ'}
                     </Button>
                 </div>
 
@@ -305,10 +304,7 @@ export default function AudioGeneratorPage() {
                                         }}
                                     >
                                         {generatingAudio ? (
-                                            <>
-                                                <Loader2 className="animate-spin mr-2 h-6 w-6" />
-                                                बनाया जा रहा है...
-                                            </>
+                                            'बनाया जा रहा है...'
                                         ) : (
                                             <>
                                                 <Mic className="mr-2 h-6 w-6" />

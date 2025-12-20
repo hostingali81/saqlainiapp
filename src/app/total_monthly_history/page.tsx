@@ -8,18 +8,20 @@ import { Button } from '@/components/ui/button'; // Import Indian currency forma
 export default async function TotalMonthlyHistory() {
     const supabase = await createClient();
 
-    // 1. Get total from 'payment' table
-    const { data: paymentData } = await supabase.from('payment').select('amount');
-    const totalPayment = paymentData?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
+    // Parallel queries for better performance
+    const [paymentData, chandaData, expensesData, bakayaData, monthlyData] = await Promise.all([
+        supabase.from('payment').select('amount'),
+        supabase.from('db_chanda').select('amount'),
+        supabase.from('expenses').select('amount, head'),
+        supabase.from('user_list').select('bakaya_month'),
+        supabase.from('payment').select('year, month, amount, user_id, id')
+    ]);
 
-    // 2. Get total from 'db_chanda' table
-    const { data: chandaData } = await supabase.from('db_chanda').select('amount');
-    const totalChanda = chandaData?.reduce((sum, c) => sum + (c.amount || 0), 0) || 0;
-
-    // 3. Get expenses
-    const { data: expensesData } = await supabase.from('expenses').select('amount, head');
-    const expensesSaqlaini = expensesData?.filter(e => !e.head || e.head === 'SaqlainiApp').reduce((sum, e) => sum + (e.amount || 0), 0) || 0;
-    const expensesChanda = expensesData?.filter(e => e.head === 'Chanda').reduce((sum, e) => sum + (e.amount || 0), 0) || 0;
+    const totalPayment = paymentData.data?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
+    const totalChanda = chandaData.data?.reduce((sum, c) => sum + (c.amount || 0), 0) || 0;
+    
+    const expensesSaqlaini = expensesData.data?.filter(e => !e.head || e.head === 'SaqlainiApp').reduce((sum, e) => sum + (e.amount || 0), 0) || 0;
+    const expensesChanda = expensesData.data?.filter(e => e.head === 'Chanda').reduce((sum, e) => sum + (e.amount || 0), 0) || 0;
     const totalExpenses = expensesSaqlaini + expensesChanda;
 
     // 4. Calculate totals
@@ -29,14 +31,11 @@ export default async function TotalMonthlyHistory() {
     const totalAvailableBalance = availableSaqlaini + availableChanda;
 
     // 5. Get total due amount
-    const { data: bakayaData } = await supabase.from('user_list').select('bakaya_month');
-    const totalDueMonths = bakayaData?.reduce((sum, u) => sum + (u.bakaya_month || 0), 0) || 0;
+    const totalDueMonths = bakayaData.data?.reduce((sum, u) => sum + (u.bakaya_month || 0), 0) || 0;
     const totalBakayaAmount = totalDueMonths * 125;
 
     // 6. Get monthly breakdown
-    const { data: monthlyData } = await supabase.from('payment').select('year, month, amount, user_id, id');
-
-    const monthlyBreakdown = monthlyData?.reduce((acc: any[], payment) => {
+    const monthlyBreakdown = monthlyData.data?.reduce((acc: any[], payment) => {
         const key = `${payment.year}-${payment.month}`;
         const existing = acc.find(item => item.key === key);
         if (existing) {
