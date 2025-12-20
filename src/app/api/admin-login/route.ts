@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { cookies } from 'next/headers';
 import { createClient } from '@/lib/supabase/server';
-import { createHash } from 'crypto';
+import { createHash, timingSafeEqual } from 'crypto';
 
 export async function POST(request: Request) {
     try {
@@ -23,13 +23,18 @@ export async function POST(request: Request) {
         // Hash password with SHA-256 and verify
         const hashedPassword = createHash('sha256').update(password).digest('hex');
 
-        if (hashedPassword !== loginData.password) {
+        // Secure comparison
+        const userHash = Buffer.from(hashedPassword);
+        const dbHash = Buffer.from(loginData.password || '');
+
+        if (userHash.length !== dbHash.length || !timingSafeEqual(userHash, dbHash)) {
             return NextResponse.json({ success: false, error: 'Invalid credentials' }, { status: 401 });
         }
 
         // Set persistent cookie (1 year expiry)
         const cookieStore = await cookies();
-        cookieStore.set('admin_auth', `${username}:${loginData.password}`, {
+        const authData = JSON.stringify({ u: username, p: loginData.password });
+        cookieStore.set('admin_auth', authData, {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'strict',

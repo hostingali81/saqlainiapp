@@ -23,13 +23,10 @@ export default async function PhotosPage() {
 
     // Verify credentials from database
     try {
-        // Validate cookie format
-        if (!adminAuth.includes(':')) {
-            cookieStore.delete('admin_auth');
-            redirect('/admin/login');
-        }
-
-        const [username, password] = adminAuth.split(':');
+        // Parse JSON cookie
+        const auth = JSON.parse(adminAuth);
+        const username = auth.u;
+        const password = auth.p;
 
         if (!username || !password) {
             cookieStore.delete('admin_auth');
