@@ -23,15 +23,33 @@ export default async function AdminPage() {
     }
 
     // Verify credentials from database
-    const [username, password] = adminAuth.split(':');
-    const { data: loginData } = await supabase
-        .from('login')
-        .select('*')
-        .eq('username', username)
-        .eq('password', password)
-        .single();
+    try {
+        // Validate cookie format
+        if (!adminAuth.includes(':')) {
+            cookieStore.delete('admin_auth');
+            redirect('/admin/login');
+        }
 
-    if (!loginData) {
+        const [username, password] = adminAuth.split(':');
+
+        if (!username || !password) {
+            cookieStore.delete('admin_auth');
+            redirect('/admin/login');
+        }
+
+        const { data: loginData } = await supabase
+            .from('login')
+            .select('*')
+            .eq('username', username)
+            .eq('password', password)
+            .single();
+
+        if (!loginData) {
+            cookieStore.delete('admin_auth');
+            redirect('/admin/login');
+        }
+    } catch (error) {
+        cookieStore.delete('admin_auth');
         redirect('/admin/login');
     }
 
