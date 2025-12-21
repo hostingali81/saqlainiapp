@@ -32,8 +32,9 @@ export async function POST(req: NextRequest) {
         const supabase = await createClient();
         const results: Record<string, any> = {};
 
-        // Which tables to sync?
-        const tablesToSync = target ? [target] : Object.keys(SHEET_NAMES);
+        // Which tables to sync? (Order matters: child tables first to avoid FK violations)
+        const syncOrder = ['payment', 'user_list', 'expenses', 'db_chanda'];
+        const tablesToSync = target ? [target] : syncOrder.filter(t => SHEET_NAMES[t]);
 
         for (const table of tablesToSync) {
             const sheetName = SHEET_NAMES[table];
@@ -126,14 +127,25 @@ export async function POST(req: NextRequest) {
                     if (upsertError) throw upsertError;
                 }
 
-                // 5. Perform Deletions
+                // 5. Perform Deletions (Child tables first to avoid FK violations)
                 if (idsToDelete.length > 0) {
-                    console.log(`[DEBUG] ${table}: Deleting IDs ->`, idsToDelete);
+                    console.log(`[DELETE] ${table}: Removing ${idsToDelete.length} entries ->`, idsToDelete);
+                    
+                    // Special handling for user_list: delete payments first
+                    if (table === 'user_list') {
+                        const { error: paymentDelError } = await supabase
+                            .from('payment')
+                            .delete()
+                            .in('user_id', idsToDelete);
+                        if (paymentDelError) console.warn(`[WARN] Payment cleanup failed:`, paymentDelError);
+                    }
+                    
                     const { error: delError } = await supabase.from(table).delete().in('id', idsToDelete);
                     if (delError) {
-                        console.error(`[ERROR] Delete failed:`, delError);
+                        console.error(`[ERROR] Delete failed for ${table}:`, delError);
                         throw delError;
                     }
+                    console.log(`[SUCCESS] ${table}: Deleted ${idsToDelete.length} rows`);
                 } else {
                     console.log(`[DEBUG] ${table}: No deletions detected.`);
                 }
