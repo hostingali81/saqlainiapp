@@ -16,6 +16,17 @@ export function Header() {
             setTotalAmount(data || 0);
         }
         fetchTotal();
+        
+        // Realtime subscription for payment changes
+        const channel = supabase
+            .channel('payment_changes')
+            .on('postgres_changes', 
+                { event: '*', schema: 'public', table: 'payment' },
+                () => fetchTotal()
+            )
+            .subscribe();
+
+        return () => { supabase.removeChannel(channel); };
     }, []);
 
     const formattedAmount = totalAmount !== null ? formatIndianCurrency(totalAmount) : null;
