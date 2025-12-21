@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
         const { token, target } = body; // target is optional (e.g., 'payment')
-        
+
         console.log(`[REQUEST] Received sync request with target: ${target}`);
 
         const SECRET_TOKEN = process.env.SYNC_SECRET_TOKEN || "my-secure-sync-token-123";
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
         // Which tables to sync? (Order matters: child tables first to avoid FK violations)
         const syncOrder = ['payment', 'user_list', 'expenses', 'db_chanda'];
         let tablesToSync: string[];
-        
+
         if (target) {
             // If target is user_list, also sync payment (they're linked)
             if (target === 'user_list') {
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
         } else {
             tablesToSync = syncOrder.filter(t => SHEET_NAMES[t]);
         }
-        
+
         console.log(`[SYNC] Target: ${target || 'ALL'}, Tables: ${tablesToSync.join(', ')}`);
 
         for (const table of tablesToSync) {
@@ -69,14 +69,29 @@ export async function POST(req: NextRequest) {
 
                 // 2. Fetch Existing Data from DB for Comparison (Smart Diff)
                 // Fetch all columns to compare content
-                const { data: dbRows } = await supabase
-                    .from(table)
-                    .select('*')
-                    .range(0, 20000); // 20k Limit
-
+                // 2. Fetch Existing Data from DB for Comparison (Smart Diff)
+                // Fetch all columns to compare content using pagination to bypass API limits
                 const dbMap = new Map();
-                if (dbRows) {
-                    dbRows.forEach((row: any) => dbMap.set(String(row.id), row));
+                let hasMore = true;
+                let from = 0;
+                const BATCH_SIZE = 1000;
+
+                while (hasMore) {
+                    const { data: batch, error } = await supabase
+                        .from(table)
+                        .select('*')
+                        .range(from, from + BATCH_SIZE - 1);
+
+                    if (error) throw error;
+
+                    if (batch && batch.length > 0) {
+                        batch.forEach((row: any) => dbMap.set(String(row.id), row));
+                        from += BATCH_SIZE;
+                        // If we got fewer rows than requested, we're done
+                        if (batch.length < BATCH_SIZE) hasMore = false;
+                    } else {
+                        hasMore = false;
+                    }
                 }
 
                 console.log(`[DEBUG] ${table}: Sheet Rows: ${sheetData.length}, DB Rows: ${dbMap.size}`);
@@ -147,7 +162,7 @@ export async function POST(req: NextRequest) {
                 // 5. Perform Deletions (Child tables first to avoid FK violations)
                 if (idsToDelete.length > 0) {
                     console.log(`[DELETE] ${table}: Removing ${idsToDelete.length} entries ->`, idsToDelete);
-                    
+
                     // Special handling for user_list: delete payments first
                     if (table === 'user_list') {
                         const { error: paymentDelError } = await supabase
@@ -156,7 +171,7 @@ export async function POST(req: NextRequest) {
                             .in('user_id', idsToDelete);
                         if (paymentDelError) console.warn(`[WARN] Payment cleanup failed:`, paymentDelError);
                     }
-                    
+
                     const { error: delError } = await supabase.from(table).delete().in('id', idsToDelete);
                     if (delError) {
                         console.error(`[ERROR] Delete failed for ${table}:`, delError);
