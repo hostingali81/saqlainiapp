@@ -69,20 +69,24 @@ export function mapRowsToObjects(rows: any[][], mapping: Record<string, string>)
     // Process rows
     for (let i = 1; i < rows.length; i++) {
         const row = rows[i];
-        if (row.every((c: any) => !c)) continue; // Skip empty rows
+        // Check if row is physically empty or all cells are empty strings
+        if (!row || row.length === 0 || row.every((c: any) => c === '' || c === undefined || c === null)) continue;
 
         const obj: any = {};
-        let hasData = false;
 
         for (const [dbCol, index] of Object.entries(colIndexMap)) {
+            // Safe access
             const val = row[index];
-            if (val !== undefined && val !== '') {
+            if (val !== undefined && val !== null && val !== '') {
                 obj[dbCol] = cleanValue(val);
-                hasData = true;
             }
         }
 
-        if (hasData) data.push(obj);
+        // CRITICAL: Ensure we have an ID. If ID is missing, we can't sync it.
+        // This prevents "undefined" rows from breaking the logic.
+        if (obj.id) {
+            data.push(obj);
+        }
     }
     return data;
 }
