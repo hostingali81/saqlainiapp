@@ -7,7 +7,9 @@ import { calculateBakayaStatus } from '@/lib/logic';
 const MAPPINGS: Record<string, Record<string, string>> = {
     'user_list': { 'id': 'id', 'name': 'name', 'fname': 'fname', 'phone': 'phone', 'frequency': 'frequency', 'hindi_name': 'hindi_name' },
     'payment': { 'payment_id': 'id', 'user_id': 'user_id', 'amount': 'amount', 'year': 'year', 'month': 'month' },
+    // Exact match from user: ExpensesID, Timestamp, Category, Description, PaymentDate, Amount, Remarks, Head
     'expenses': { 'ExpensesID': 'id', 'Category': 'category', 'Description': 'details', 'PaymentDate': 'date', 'Amount': 'amount', 'Remarks': 'remarks', 'Head': 'head' },
+    // Exact match from user: ChandaID, Timestamp, Name, Date, Amount, Remarks, NameHindi
     'db_chanda': { 'ChandaID': 'id', 'Timestamp': 'timestamp', 'Name': 'name', 'NameHindi': 'hindi_name', 'Date': 'date', 'Amount': 'amount', 'Remarks': 'remarks' }
 };
 
