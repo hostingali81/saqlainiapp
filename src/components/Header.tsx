@@ -10,8 +10,9 @@ export function Header() {
     const [totalAmount, setTotalAmount] = useState<number | null>(null);
 
     useEffect(() => {
+        const supabase = createClient();
+        
         async function fetchTotal() {
-            const supabase = createClient();
             const { data } = await supabase.rpc('get_total_payment_amount');
             setTotalAmount(data || 0);
         }
