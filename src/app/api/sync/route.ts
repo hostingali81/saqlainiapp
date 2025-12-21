@@ -34,7 +34,22 @@ export async function POST(req: NextRequest) {
 
         // Which tables to sync? (Order matters: child tables first to avoid FK violations)
         const syncOrder = ['payment', 'user_list', 'expenses', 'db_chanda'];
-        const tablesToSync = target ? [target] : syncOrder.filter(t => SHEET_NAMES[t]);
+        let tablesToSync: string[];
+        
+        if (target) {
+            // If target is user_list, also sync payment (they're linked)
+            if (target === 'user_list') {
+                tablesToSync = ['payment', 'user_list'];
+            } else if (target === 'payment') {
+                tablesToSync = ['payment', 'user_list'];
+            } else {
+                tablesToSync = [target];
+            }
+        } else {
+            tablesToSync = syncOrder.filter(t => SHEET_NAMES[t]);
+        }
+        
+        console.log(`[SYNC] Target: ${target || 'ALL'}, Tables: ${tablesToSync.join(', ')}`);
 
         for (const table of tablesToSync) {
             const sheetName = SHEET_NAMES[table];
