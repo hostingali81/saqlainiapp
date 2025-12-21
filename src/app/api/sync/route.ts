@@ -12,6 +12,8 @@ export async function POST(req: NextRequest) {
         if (token !== SECRET_TOKEN) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
         const results = await performSync(target);
+        const { revalidatePath } = await import('next/cache');
+        revalidatePath('/', 'layout');
 
         return NextResponse.json({ success: true, results });
 

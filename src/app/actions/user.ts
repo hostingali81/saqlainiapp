@@ -85,6 +85,7 @@ export async function processSmartPayment(userId: number, amount: number) {
         .update({ bakaya_month: newBakaya })
         .eq('id', userId);
 
+    revalidatePath('/');
     revalidatePath(`/profile/${userId}`);
     return { success: true, allocated: allocations };
 }

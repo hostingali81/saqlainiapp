@@ -14,7 +14,7 @@ export async function triggerSync(target: string) {
 
     try {
         const results = await performSync(target);
-        revalidatePath('/admin');
+        revalidatePath('/', 'layout');
         return { success: true, results };
     } catch (error: any) {
         return { success: false, error: error.message };
