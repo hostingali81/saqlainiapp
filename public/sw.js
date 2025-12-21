@@ -1,6 +1,5 @@
-const CACHE_NAME = 'saqlaini-v1';
+const CACHE_NAME = 'saqlaini-v2';
 const urlsToCache = [
-    '/',
     '/manifest.json',
     '/icons/icon-192x192.png',
     '/icons/icon-512x512.png'
@@ -15,26 +14,21 @@ self.addEventListener('install', (event) => {
 });
 
 self.addEventListener('fetch', (event) => {
+    const url = new URL(event.request.url);
+    
+    // Never cache API calls, profile pages, or dynamic routes
+    if (url.pathname.startsWith('/api/') || 
+        url.pathname.startsWith('/profile/') ||
+        url.pathname === '/' ||
+        event.request.method !== 'GET') {
+        event.respondWith(fetch(event.request));
+        return;
+    }
+    
+    // Only cache static assets
     event.respondWith(
         caches.match(event.request)
-            .then((response) => {
-                if (response) {
-                    return response;
-                }
-                return fetch(event.request).then(
-                    (response) => {
-                        if (!response || response.status !== 200 || response.type !== 'basic') {
-                            return response;
-                        }
-                        const responseToCache = response.clone();
-                        caches.open(CACHE_NAME)
-                            .then((cache) => {
-                                cache.put(event.request, responseToCache);
-                            });
-                        return response;
-                    }
-                );
-            })
+            .then((response) => response || fetch(event.request))
     );
 });
 
