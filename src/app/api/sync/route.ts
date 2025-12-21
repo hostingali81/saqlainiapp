@@ -78,17 +78,26 @@ export async function POST(req: NextRequest) {
                         if (table === 'payment') usersToRecalculate.add(String(row.user_id));
                     } else {
                         // EXISTING ROW - Compare Content
-                        // We filter out Supabase system fields (created_at, etc) by only checking keys in sheet row
                         const isDifferent = Object.keys(row).some(key => {
-                            // Loose comparison (==) handles string/number differences (e.g. "2024" == 2024)
-                            return row[key] != dbRow[key];
+                            let val1 = row[key];
+                            let val2 = dbRow[key];
+
+                            // START: Normalization
+                            if (val1 === null || val1 === undefined) val1 = "";
+                            if (val2 === null || val2 === undefined) val2 = "";
+
+                            val1 = String(val1).trim();
+                            val2 = String(val2).trim();
+                            // END: Normalization
+
+                            return val1 !== val2;
                         });
 
                         if (isDifferent) {
                             rowsToUpsert.push(row);
                             if (table === 'payment') {
                                 usersToRecalculate.add(String(row.user_id));
-                                usersToRecalculate.add(String(dbRow.user_id)); // In case user_id changed
+                                usersToRecalculate.add(String(dbRow.user_id));
                             }
                         }
                     }
