@@ -5,6 +5,7 @@ import { User } from '@/types';
 import Link from 'next/link';
 import { Camera } from 'lucide-react';
 import { LogoutButton } from '@/components/LogoutButton';
+import { SyncControls } from '@/components/admin/SyncControls';
 import { redirect } from 'next/navigation';
 
 export const revalidate = 0;
@@ -45,6 +46,8 @@ export default async function AdminPage() {
                     <LogoutButton variant="outline" size="sm" />
                 </div>
             </div>
+
+            <SyncControls />
 
             <SmartEntryForm users={usersWithImages} />
         </main>
