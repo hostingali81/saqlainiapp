@@ -16,6 +16,9 @@ const nextConfig = {
   reactStrictMode: true,
   experimental: {
     optimizePackageImports: ['lucide-react', '@radix-ui/react-avatar'],
+    staleTimes: {
+      dynamic: 0,
+    },
   },
 };
 
