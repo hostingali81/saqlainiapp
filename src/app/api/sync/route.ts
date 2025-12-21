@@ -6,8 +6,8 @@ import { calculateBakayaStatus } from '@/lib/logic';
 // --- CONFIGURATION ---
 const MAPPINGS: Record<string, Record<string, string>> = {
     // Sheet Header -> DB Column Name
-    'user_list': { 'id': 'id', 'name': 'name', 'fname': 'fname', 'phone': 'phone', 'frequency': 'frequency', 'NameHindi': 'hindi_name' },
-    'payment': { 'PaymentID': 'id', 'UserID': 'user_id', 'Amount': 'amount', 'Year': 'year', 'Month': 'month' },
+    'user_list': { 'id': 'id', 'name': 'name', 'fname': 'fname', 'phone': 'phone', 'frequency': 'frequency', 'hindi_name': 'hindi_name' },
+    'payment': { 'payment_id': 'id', 'user_id': 'user_id', 'amount': 'amount', 'year': 'year', 'month': 'month' },
     // Exact match from user: ExpensesID, Timestamp, Category, Description, PaymentDate, Amount, Remarks, Head
     'expenses': { 'ExpensesID': 'id', 'Category': 'category', 'Description': 'details', 'PaymentDate': 'date', 'Amount': 'amount', 'Remarks': 'remarks', 'Head': 'head' },
     // Exact match from user: ChandaID, Timestamp, Name, Date, Amount, Remarks, NameHindi
