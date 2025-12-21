@@ -90,7 +90,14 @@ export async function POST(req: NextRequest) {
                             val2 = String(val2).trim();
                             // END: Normalization
 
-                            return val1 !== val2;
+                            if (val1 !== val2) {
+                                // Log the first few differences to avoid spamming
+                                if (Math.random() < 0.05) { // Sample 5% of diffs
+                                    console.log(`[DIFF] Table: ${table}, ID: ${row.id}, Key: ${key} | Sheet: "${val1}" vs DB: "${val2}"`);
+                                }
+                                return true;
+                            }
+                            return false;
                         });
 
                         if (isDifferent) {
