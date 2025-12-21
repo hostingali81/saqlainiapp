@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { getSheetData, mapRowsToObjects } from '@/lib/sheets';
 import { calculateBakayaStatus } from '@/lib/logic';
 
@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
         const SECRET_TOKEN = process.env.SYNC_SECRET_TOKEN || "my-secure-sync-token-123";
         if (token !== SECRET_TOKEN) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-        const supabase = await createClient();
+        const supabase = createAdminClient();
         const results: Record<string, any> = {};
 
         // Which tables to sync? (Order matters: child tables first to avoid FK violations)
