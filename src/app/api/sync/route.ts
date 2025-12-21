@@ -41,55 +41,91 @@ export async function POST(req: NextRequest) {
             try {
                 // 1. Fetch Data from Sheet (PULL)
                 const rows = await getSheetData(sheetName);
-                const data = mapRowsToObjects(rows, MAPPINGS[table]);
+                const sheetData = mapRowsToObjects(rows, MAPPINGS[table]);
 
-                if (data.length === 0) {
+                if (sheetData.length === 0) {
                     results[table] = "No data found";
                     continue;
                 }
 
-                // 2. Upsert Data (Insert/Update)
-                const { error: upsertError } = await supabase.from(table).upsert(data);
-                if (upsertError) throw upsertError;
-
-                // 3. Handle Deletions (Smart Diff)
-                // Fetch all IDs from DB (Supabase defaults to 1000, so we increase range)
+                // 2. Fetch Existing Data from DB for Comparison (Smart Diff)
+                // Fetch all columns to compare content
                 const { data: dbRows } = await supabase
                     .from(table)
-                    .select('id')
-                    .range(0, 20000); // Support up to 20k rows for now
+                    .select('*')
+                    .range(0, 20000); // 20k Limit
 
-                const dbIds = new Set(dbRows?.map(r => r.id) || []);
-                const sheetIds = new Set(data.map(r => String(r.id))); // Ensure string comparison
+                const dbMap = new Map();
+                if (dbRows) {
+                    dbRows.forEach((row: any) => dbMap.set(String(row.id), row));
+                }
 
-                const idsToDelete = [...dbIds].filter(id => !sheetIds.has(String(id)));
+                // 3. Identify Changes
+                const rowsToUpsert: any[] = [];
+                const idsToDelete: string[] = [];
+                const usersToRecalculate = new Set<string>();
 
-                if (idsToDelete.length > 0) {
-                    // Delete & Return deleted rows for triggers
-                    const { data: deleted, error: delError } = await supabase
-                        .from(table)
-                        .delete()
-                        .in('id', idsToDelete)
-                        .select();
+                // Check for Updates/Inserts
+                for (const row of sheetData) {
+                    const idStr = String(row.id);
+                    const dbRow = dbMap.get(idStr);
 
-                    if (delError) throw delError;
+                    if (!dbRow) {
+                        // NEW ROW
+                        rowsToUpsert.push(row);
+                        if (table === 'payment') usersToRecalculate.add(String(row.user_id));
+                    } else {
+                        // EXISTING ROW - Compare Content
+                        // We filter out Supabase system fields (created_at, etc) by only checking keys in sheet row
+                        const isDifferent = Object.keys(row).some(key => {
+                            // Loose comparison (==) handles string/number differences (e.g. "2024" == 2024)
+                            return row[key] != dbRow[key];
+                        });
 
-                    // TRIGGER: Payment Deletion -> Recalculate Bakaya
-                    if (table === 'payment' && deleted) {
-                        const userIds = new Set(deleted.map((p: any) => p.user_id));
-                        await recalculateBakayaBatch(supabase, userIds);
+                        if (isDifferent) {
+                            rowsToUpsert.push(row);
+                            if (table === 'payment') {
+                                usersToRecalculate.add(String(row.user_id));
+                                usersToRecalculate.add(String(dbRow.user_id)); // In case user_id changed
+                            }
+                        }
                     }
+
+                    // Mark as visited (remove from map so only deleted remain)
+                    dbMap.delete(idStr);
                 }
 
-                // 4. TRIGGER: Payment Upsert -> Recalculate Bakaya
-                // (We do this for ALL users involved in the upsert to be safe, or we can optimize if needed.
-                // For now, recalculating involved users is safe.)
-                if (table === 'payment') {
-                    const userIds = new Set(data.map((p: any) => p.user_id));
-                    await recalculateBakayaBatch(supabase, userIds);
+                // Remaining in dbMap are DELETED rows
+                for (const [id, row] of dbMap.entries()) {
+                    idsToDelete.push(id);
+                    if (table === 'payment') usersToRecalculate.add(String(row.user_id));
                 }
 
-                results[table] = { success: true, count: data.length, deleted: idsToDelete.length };
+                // 4. Perform Updates (Batch)
+                if (rowsToUpsert.length > 0) {
+                    const { error: upsertError } = await supabase.from(table).upsert(rowsToUpsert);
+                    if (upsertError) throw upsertError;
+                }
+
+                // 5. Perform Deletions
+                if (idsToDelete.length > 0) {
+                    const { error: delError } = await supabase.from(table).delete().in('id', idsToDelete);
+                    if (delError) throw delError;
+                }
+
+                // 6. TRIGGER: Recalculate Bakaya (Only for affected users)
+                if (table === 'payment' && usersToRecalculate.size > 0) {
+                    console.log(`Recalculating Bakaya for ${usersToRecalculate.size} users...`);
+                    await recalculateBakayaBatch(supabase, usersToRecalculate);
+                }
+
+                results[table] = {
+                    success: true,
+                    totalInSheet: sheetData.length,
+                    upserted: rowsToUpsert.length,
+                    deleted: idsToDelete.length,
+                    recalculated: usersToRecalculate.size
+                };
 
             } catch (err: any) {
                 console.error(`Error syncing ${table}:`, err);
@@ -106,30 +142,39 @@ export async function POST(req: NextRequest) {
 }
 
 // --- HELPER: Bakaya Recalculation ---
-async function recalculateBakayaBatch(supabase: any, userIds: Set<any>) {
-    for (const userId of userIds) {
-        if (!userId) continue;
+async function recalculateBakayaBatch(supabase: any, userIds: Set<string>) {
+    // Process in smaller chunks to avoid any potential limits
+    const allUserIds = Array.from(userIds);
+    const CHUNK_SIZE = 50;
 
-        // Fetch User Info
-        const { data: user } = await supabase.from('user_list').select('frequency').eq('id', userId).single();
-        if (!user) continue;
+    for (let i = 0; i < allUserIds.length; i += CHUNK_SIZE) {
+        const chunk = allUserIds.slice(i, i + CHUNK_SIZE);
 
-        // Fetch Payment History
-        const { data: payments } = await supabase.from('payment').select('year, month').eq('user_id', userId);
+        // Parallelize within chunk for speed
+        await Promise.all(chunk.map(async (userId) => {
+            if (!userId) return;
 
-        const totalPaidMonths = new Set(payments?.map((p: any) => `${p.year}-${p.month}`)).size || 0;
+            // Fetch User Info
+            const { data: user } = await supabase.from('user_list').select('frequency').eq('id', userId).single();
+            if (!user) return; // Skip if user deleted
 
-        // Calculate Start Date (Min Year/Month)
-        let minYear = 9999, minMonth = 12;
-        payments?.forEach((p: any) => {
-            if (p.year < minYear) { minYear = p.year; minMonth = p.month; }
-            else if (p.year === minYear && p.month < minMonth) { minMonth = p.month; }
-        });
+            // Fetch Payment History
+            const { data: payments } = await supabase.from('payment').select('year, month').eq('user_id', userId);
 
-        // Use Logic Lib
-        const newBakaya = calculateBakayaStatus(minYear, minMonth, totalPaidMonths, user.frequency);
+            const totalPaidMonths = new Set(payments?.map((p: any) => `${p.year}-${p.month}`)).size || 0;
 
-        // Update DB
-        await supabase.from('user_list').update({ bakaya_month: newBakaya }).eq('id', userId);
+            // Calculate Start Date
+            let minYear = 9999, minMonth = 12;
+            payments?.forEach((p: any) => {
+                if (p.year < minYear) { minYear = p.year; minMonth = p.month; }
+                else if (p.year === minYear && p.month < minMonth) { minMonth = p.month; }
+            });
+
+            // Calculate
+            const newBakaya = calculateBakayaStatus(minYear, minMonth, totalPaidMonths, user.frequency);
+
+            // Update
+            await supabase.from('user_list').update({ bakaya_month: newBakaya }).eq('id', userId);
+        }));
     }
 }
