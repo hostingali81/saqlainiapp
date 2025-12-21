@@ -54,8 +54,8 @@ export function LoginForm() {
                 <form onSubmit={handleLogin} className="space-y-4">
                     <div>
                         <Input
-                            type="text"
-                            placeholder="Username"
+                            type="email"
+                            placeholder="Email"
                             value={username}
                             onChange={(e) => setUsername(e.target.value)}
                             required

@@ -5,11 +5,17 @@ import { User } from '@/types';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { LogoutButton } from '@/components/LogoutButton';
+import { redirect } from 'next/navigation';
 
 export const revalidate = 0;
 
 export default async function PhotosPage() {
     const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    if (!user) {
+        redirect('/admin/login');
+    }
 
     const { data: users, error } = await supabase
         .from('user_list')

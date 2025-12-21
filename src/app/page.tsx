@@ -1,13 +1,14 @@
 import { createClient } from '@/lib/supabase/server';
 import { UserList } from '@/components/UserList';
 import { User } from '@/types';
+import { existsSync } from 'fs';
+import path from 'path';
 
 export const revalidate = 60;
 
 export default async function Home() {
   const supabase = await createClient();
 
-  // Parallel queries for better performance
   const [usersResult, totalResult] = await Promise.all([
     supabase
       .from('user_list')
@@ -26,17 +27,19 @@ export default async function Home() {
     );
   }
 
-  // Manual sort to match PHP EXACTLY (Regular first)
   const sortedUsers = (usersResult.data as User[]).sort((a, b) => {
     if (a.frequency === 'Regular' && b.frequency !== 'Regular') return -1;
     if (a.frequency !== 'Regular' && b.frequency === 'Regular') return 1;
     return 0;
   });
 
-  const usersWithImages = sortedUsers.map(user => ({
-    ...user,
-    hasImage: false // Will be checked client-side via image onError
-  }));
+  const usersWithImages = sortedUsers.map(user => {
+    const imagePath = path.join(process.cwd(), 'public', 'upload', 'small_image', `${user.id}.jpg`);
+    return {
+      ...user,
+      hasImage: existsSync(imagePath)
+    };
+  });
 
   const totalAmount = totalResult.data || 0;
 

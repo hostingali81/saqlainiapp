@@ -3,6 +3,7 @@
 import { Button } from '@/components/ui/button';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { createClient } from '@/lib/supabase/client';
 
 export function LogoutButton({ variant = "outline", size = "sm" }: { variant?: any, size?: any }) {
     const router = useRouter();
@@ -11,12 +12,17 @@ export function LogoutButton({ variant = "outline", size = "sm" }: { variant?: a
     const handleLogout = async () => {
         setLoading(true);
         try {
-            await fetch('/api/admin-clear', { method: 'POST' });
-            router.push('/admin/login');
-            router.refresh();
+            const supabase = createClient();
+            await supabase.auth.signOut();
+            
+            // Clear all cookies
+            document.cookie.split(";").forEach((c) => {
+                document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
+            });
+            
+            window.location.href = '/admin/login';
         } catch (error) {
             console.error('Logout failed:', error);
-        } finally {
             setLoading(false);
         }
     };
