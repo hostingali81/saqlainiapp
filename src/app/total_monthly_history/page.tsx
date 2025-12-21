@@ -7,34 +7,74 @@ import { Button } from '@/components/ui/button'; // Import Indian currency forma
 export default async function TotalMonthlyHistory() {
     const supabase = await createClient();
 
-    // Parallel queries for better performance
-    const [paymentData, chandaData, expensesData, bakayaData, monthlyData] = await Promise.all([
-        supabase.from('payment').select('amount'),
-        supabase.from('db_chanda').select('amount'),
-        supabase.from('expenses').select('amount, head'),
-        supabase.from('user_list').select('bakaya_month'),
-        supabase.from('payment').select('year, month, amount, user_id, id')
-    ]);
+    // Use aggregation for totals and fetch detailed data separately
+    const paymentTotal = await supabase.from('payment').select('amount');
+    const chandaTotal = await supabase.from('db_chanda').select('amount');
+    const expensesAll = await supabase.from('expenses').select('amount, head');
+    const bakayaAll = await supabase.from('user_list').select('bakaya_month');
+    const monthlyAll = await supabase.from('payment').select('year, month, amount, user_id, id');
 
-    const totalPayment = paymentData.data?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
-    const totalChanda = chandaData.data?.reduce((sum, c) => sum + (c.amount || 0), 0) || 0;
+    // Fetch all records using multiple queries if needed
+    let allPayments = paymentTotal.data || [];
+    let allMonthly = monthlyAll.data || [];
+    let allExpenses = expensesAll.data || [];
+    
+    // If we got exactly 1000, fetch more
+    if (allPayments.length === 1000) {
+        let offset = 1000;
+        while (true) {
+            const { data } = await supabase.from('payment').select('amount').range(offset, offset + 999);
+            if (!data || data.length === 0) break;
+            allPayments = [...allPayments, ...data];
+            offset += 1000;
+            if (data.length < 1000) break;
+        }
+    }
+    
+    if (allMonthly.length === 1000) {
+        let offset = 1000;
+        while (true) {
+            const { data } = await supabase.from('payment').select('year, month, amount, user_id, id').range(offset, offset + 999);
+            if (!data || data.length === 0) break;
+            allMonthly = [...allMonthly, ...data];
+            offset += 1000;
+            if (data.length < 1000) break;
+        }
+    }
+    
+    if (allExpenses.length === 1000) {
+        let offset = 1000;
+        while (true) {
+            const { data } = await supabase.from('expenses').select('amount, head').range(offset, offset + 999);
+            if (!data || data.length === 0) break;
+            allExpenses = [...allExpenses, ...data];
+            offset += 1000;
+            if (data.length < 1000) break;
+        }
+    }
 
-    const expensesSaqlaini = expensesData.data?.filter(e => !e.head || e.head === 'SaqlainiApp').reduce((sum, e) => sum + (e.amount || 0), 0) || 0;
-    const expensesChanda = expensesData.data?.filter(e => e.head === 'Chanda').reduce((sum, e) => sum + (e.amount || 0), 0) || 0;
+    const totalPayment = allPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+    const totalChanda = chandaTotal.data?.reduce((sum, c) => sum + (Number(c.amount) || 0), 0) || 0;
+
+    // Split expenses by head
+    const expensesSaqlaini = allExpenses.filter(e => e.head === 'SaqlainiApp' || e.head === null || e.head === '').reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+    const expensesChanda = allExpenses.filter(e => e.head === 'Chanda').reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
     const totalExpenses = expensesSaqlaini + expensesChanda;
 
-    // 4. Calculate totals
-    const grandTotalCollection = totalPayment + totalChanda;
+    // Calculate available balances
     const availableSaqlaini = totalPayment - expensesSaqlaini;
     const availableChanda = totalChanda - expensesChanda;
+    
+    // Calculate totals
+    const grandTotalCollection = totalPayment + totalChanda;
     const totalAvailableBalance = availableSaqlaini + availableChanda;
 
     // 5. Get total due amount
-    const totalDueMonths = bakayaData.data?.reduce((sum, u) => sum + (u.bakaya_month || 0), 0) || 0;
+    const totalDueMonths = bakayaAll.data?.reduce((sum, u) => sum + (Number(u.bakaya_month) || 0), 0) || 0;
     const totalBakayaAmount = totalDueMonths * 125;
 
     // 6. Get monthly breakdown
-    const monthlyBreakdown = monthlyData.data?.reduce((acc: any[], payment) => {
+    const monthlyBreakdown = allMonthly.reduce((acc: any[], payment) => {
         const key = `${payment.year}-${payment.month}`;
         const existing = acc.find(item => item.key === key);
         if (existing) {
@@ -198,13 +238,12 @@ export default async function TotalMonthlyHistory() {
                 </div>
 
                 <div>
-                    {collections.map((collection, idx) => (
+                    {collections.map((collection) => (
                         <div
-                            key={idx}
+                            key={`${collection.year}-${collection.monthNum}`}
                             className="p-4 flex flex-col gap-2"
                             style={{
-                                borderBottom: idx < collections.length - 1 ? '1px solid #E5D3AA' : 'none',
-                                background: idx % 2 === 0 ? 'transparent' : 'rgba(229, 211, 170, 0.1)'
+                                borderBottom: '1px solid #E5D3AA'
                             }}
                         >
                             <div className="flex justify-between items-center">
