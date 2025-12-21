@@ -53,8 +53,12 @@ export async function POST(req: NextRequest) {
                 if (upsertError) throw upsertError;
 
                 // 3. Handle Deletions (Smart Diff)
-                // Fetch all IDs from DB
-                const { data: dbRows } = await supabase.from(table).select('id');
+                // Fetch all IDs from DB (Supabase defaults to 1000, so we increase range)
+                const { data: dbRows } = await supabase
+                    .from(table)
+                    .select('id')
+                    .range(0, 20000); // Support up to 20k rows for now
+
                 const dbIds = new Set(dbRows?.map(r => r.id) || []);
                 const sheetIds = new Set(data.map(r => String(r.id))); // Ensure string comparison
 
