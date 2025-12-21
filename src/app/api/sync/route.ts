@@ -60,6 +60,8 @@ export async function POST(req: NextRequest) {
                     dbRows.forEach((row: any) => dbMap.set(String(row.id), row));
                 }
 
+                console.log(`[DEBUG] ${table}: Sheet Rows: ${sheetData.length}, DB Rows: ${dbMap.size}`);
+
                 // 3. Identify Changes
                 const rowsToUpsert: any[] = [];
                 const idsToDelete: string[] = [];
@@ -109,8 +111,14 @@ export async function POST(req: NextRequest) {
 
                 // 5. Perform Deletions
                 if (idsToDelete.length > 0) {
+                    console.log(`[DEBUG] ${table}: Deleting IDs ->`, idsToDelete);
                     const { error: delError } = await supabase.from(table).delete().in('id', idsToDelete);
-                    if (delError) throw delError;
+                    if (delError) {
+                        console.error(`[ERROR] Delete failed:`, delError);
+                        throw delError;
+                    }
+                } else {
+                    console.log(`[DEBUG] ${table}: No deletions detected.`);
                 }
 
                 // 6. TRIGGER: Recalculate Bakaya (Only for affected users)
