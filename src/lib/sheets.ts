@@ -35,10 +35,66 @@ export async function getSheetData(range: string) {
             range,
         });
 
-        // Return rows (arrays of strings)
         return response.data.values || [];
     } catch (error: any) {
         console.error(`Error fetching sheet range ${range}:`, error.message);
+        throw error;
+    }
+}
+
+export async function updateSheetRow(range: string, values: any[][]) {
+    const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+    if (!spreadsheetId) {
+        throw new Error('Missing GOOGLE_SHEET_ID in .env.local');
+    }
+
+    const auth = await getAuthClient();
+    const sheets = google.sheets({ version: 'v4', auth: auth as any });
+
+    try {
+        const response = await sheets.spreadsheets.values.update({
+            spreadsheetId,
+            range,
+            valueInputOption: 'USER_ENTERED',
+            requestBody: {
+                values
+            }
+        });
+        return response.data;
+    } catch (error: any) {
+        console.error(`Error updating sheet range ${range}:`, error.message);
+        throw error;
+    }
+}
+
+export async function deleteSheetRow(rowIndex: number, sheetId: number = 0) {
+    const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+    if (!spreadsheetId) {
+        throw new Error('Missing GOOGLE_SHEET_ID in .env.local');
+    }
+
+    const auth = await getAuthClient();
+    const sheets = google.sheets({ version: 'v4', auth: auth as any });
+
+    try {
+        const response = await sheets.spreadsheets.batchUpdate({
+            spreadsheetId,
+            requestBody: {
+                requests: [{
+                    deleteDimension: {
+                        range: {
+                            sheetId: sheetId,
+                            dimension: 'ROWS',
+                            startIndex: rowIndex,
+                            endIndex: rowIndex + 1
+                        }
+                    }
+                }]
+            }
+        });
+        return response.data;
+    } catch (error: any) {
+        console.error(`Error deleting row ${rowIndex}:`, error.message);
         throw error;
     }
 }

@@ -1,11 +1,13 @@
 import { createClient } from '@/lib/supabase/server';
 import { SmartEntryForm } from '@/components/SmartEntryForm';
+import { PaymentEntriesTable } from '@/components/PaymentEntriesTable';
 import { Button } from '@/components/ui/button';
 import { User } from '@/types';
 import Link from 'next/link';
 import { Camera, RefreshCw } from 'lucide-react';
 import { LogoutButton } from '@/components/LogoutButton';
 import { redirect } from 'next/navigation';
+import { AdminPageClient } from '@/components/admin/AdminPageClient';
 
 export const revalidate = 0;
 
@@ -52,7 +54,7 @@ export default async function AdminPage() {
                 </div>
             </div>
 
-            <SmartEntryForm users={usersWithImages} />
+            <AdminPageClient users={usersWithImages} />
         </main>
     );
 }

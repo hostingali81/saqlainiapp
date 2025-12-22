@@ -12,9 +12,10 @@ import { Check } from 'lucide-react';
 
 interface SmartEntryFormProps {
     users: User[];
+    onPaymentSuccess?: () => void;
 }
 
-export function SmartEntryForm({ users }: SmartEntryFormProps) {
+export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps) {
     const [selectedUserId, setSelectedUserId] = useState<string>('');
     const [amount, setAmount] = useState<string>('');
     const [remarks, setRemarks] = useState<Record<string, string>>({});
@@ -110,6 +111,7 @@ export function SmartEntryForm({ users }: SmartEntryFormProps) {
                 setRemarks({});
                 setGlobalRemark('');
                 setShowRemarkDialog(false);
+                onPaymentSuccess?.();
             }
         } catch (e) {
             setResult({ error: 'An unexpected error occurred.' });
