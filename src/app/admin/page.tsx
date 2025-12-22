@@ -33,19 +33,19 @@ export default async function AdminPage() {
 
     return (
         <main className="container max-w-md mx-auto p-4 min-h-screen bg-background pb-24">
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
                 <h1 className="text-2xl font-bold text-primary font-serif">Admin Dashboard</h1>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                     <Link href="/admin/admin/sync">
                         <Button variant="outline" size="sm">
-                            <RefreshCw className="h-4 w-4 mr-2" />
-                            Sync
+                            <RefreshCw className="h-4 w-4 sm:mr-2" />
+                            <span className="hidden sm:inline">Sync</span>
                         </Button>
                     </Link>
                     <Link href="/admin/photos">
                         <Button variant="outline" size="sm">
-                            <Camera className="h-4 w-4 mr-2" />
-                            Photos
+                            <Camera className="h-4 w-4 sm:mr-2" />
+                            <span className="hidden sm:inline">Photos</span>
                         </Button>
                     </Link>
                     <LogoutButton variant="outline" size="sm" />

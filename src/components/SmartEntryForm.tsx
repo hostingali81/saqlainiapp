@@ -251,12 +251,12 @@ export function SmartEntryForm({ users }: SmartEntryFormProps) {
             </Card>
 
             <Dialog open={showRemarkDialog} onOpenChange={setShowRemarkDialog}>
-                <DialogContent className="max-w-md">
+                <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle>Add Remarks</DialogTitle>
                     </DialogHeader>
                     <div className="space-y-3">
-                        <div className="flex gap-2">
+                        <div className="flex flex-col sm:flex-row gap-2">
                             <Input
                                 type="text"
                                 placeholder="Global remark for all months"
@@ -268,11 +268,12 @@ export function SmartEntryForm({ users }: SmartEntryFormProps) {
                                 type="button"
                                 size="sm"
                                 onClick={applyGlobalRemark}
+                                className="w-full sm:w-auto"
                             >
                                 Apply to All
                             </Button>
                         </div>
-                        <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                        <div className="space-y-2 max-h-[50vh] overflow-y-auto">
                             {allocatedMonths.map(({month, amount}) => {
                                 const monthKey = `${month.year}-${month.month}`;
                                 return (
