@@ -53,12 +53,12 @@ export function SearchableSelect({ options, value, onChange, placeholder = "Sele
             <button
                 type="button"
                 onClick={() => setIsOpen(!isOpen)}
-                className="w-full p-2 border rounded-md bg-background text-left flex items-center justify-between hover:bg-accent"
+                className="w-full p-2 border rounded-md bg-background text-left flex items-center justify-between hover:bg-accent group"
             >
-                <span className={selectedOption ? "text-foreground" : "text-muted-foreground"}>
+                <span className={selectedOption ? "text-foreground group-hover:text-white" : "text-muted-foreground group-hover:text-white"}>
                     {selectedOption ? selectedOption.label : placeholder}
                 </span>
-                <ChevronDown className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                <ChevronDown className={`h-4 w-4 transition-transform group-hover:text-white ${isOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {/* Dropdown */}
@@ -91,7 +91,7 @@ export function SearchableSelect({ options, value, onChange, placeholder = "Sele
                                     key={option.value}
                                     type="button"
                                     onClick={() => handleSelect(option.value)}
-                                    className={`w-full text-left px-4 py-2 hover:bg-accent ${option.value === value ? 'bg-accent font-medium' : ''
+                                    className={`w-full text-left px-4 py-2 hover:bg-accent hover:text-white ${option.value === value ? 'bg-accent text-white font-medium' : ''
                                         }`}
                                 >
                                     {option.label}

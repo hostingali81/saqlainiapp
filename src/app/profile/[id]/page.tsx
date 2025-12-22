@@ -8,6 +8,8 @@ import { ArrowLeft, Phone, User as UserIcon } from 'lucide-react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { formatIndianCurrency } from '@/lib/utils';
+import { Suspense } from 'react';
+import { ProfileSkeleton } from '@/components/skeletons/ProfileSkeleton';
 
 interface PageProps {
     params: Promise<{ id: string }>;
@@ -17,8 +19,7 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 export const fetchCache = 'force-no-store';
 
-export default async function ProfilePage({ params }: PageProps) {
-    const { id } = await params;
+async function ProfileContent({ id }: { id: string }) {
     const userId = parseInt(id);
 
     if (isNaN(userId)) notFound();
@@ -208,5 +209,15 @@ export default async function ProfilePage({ params }: PageProps) {
                 />
             </div>
         </main>
+    );
+}
+
+export default async function ProfilePage({ params }: PageProps) {
+    const { id } = await params;
+    
+    return (
+        <Suspense fallback={<ProfileSkeleton />}>
+            <ProfileContent id={id} />
+        </Suspense>
     );
 }

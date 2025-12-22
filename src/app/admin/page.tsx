@@ -3,9 +3,8 @@ import { SmartEntryForm } from '@/components/SmartEntryForm';
 import { Button } from '@/components/ui/button';
 import { User } from '@/types';
 import Link from 'next/link';
-import { Camera } from 'lucide-react';
+import { Camera, RefreshCw } from 'lucide-react';
 import { LogoutButton } from '@/components/LogoutButton';
-import { SyncControls } from '@/components/admin/SyncControls';
 import { redirect } from 'next/navigation';
 
 export const revalidate = 0;
@@ -37,6 +36,12 @@ export default async function AdminPage() {
             <div className="flex items-center justify-between mb-6">
                 <h1 className="text-2xl font-bold text-primary font-serif">Admin Dashboard</h1>
                 <div className="flex gap-2">
+                    <Link href="/admin/admin/sync">
+                        <Button variant="outline" size="sm">
+                            <RefreshCw className="h-4 w-4 mr-2" />
+                            Sync
+                        </Button>
+                    </Link>
                     <Link href="/admin/photos">
                         <Button variant="outline" size="sm">
                             <Camera className="h-4 w-4 mr-2" />
@@ -46,8 +51,6 @@ export default async function AdminPage() {
                     <LogoutButton variant="outline" size="sm" />
                 </div>
             </div>
-
-            <SyncControls />
 
             <SmartEntryForm users={usersWithImages} />
         </main>

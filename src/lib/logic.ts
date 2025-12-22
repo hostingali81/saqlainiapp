@@ -117,6 +117,7 @@ export function calculateUserFinancials(user: User, payments: Payment[]): UserFi
 /**
  * Smart Allocation Logic (FIFO)
  * Determines which months should be marked as paid given a bulk amount.
+ * Current month gets 100, past months get 125 minimum.
  */
 export function allocatePayment(
     amount: number,
@@ -127,8 +128,10 @@ export function allocatePayment(
     const allocations: { year: number; month: number; amount: number }[] = [];
     let remainingAmount = amount;
 
+    const currentYear = new Date().getFullYear();
+    const currentMonth = new Date().getMonth() + 1;
+
     // Filter for due months and sort by Oldest First (FIFO)
-    // History is usually reversed (newest first), so we reverse it back to get oldest first.
     const dueMonths = [...history]
         .filter(h => h.status === 'due')
         .sort((a, b) => (a.year - b.year) || (a.month - b.month));
@@ -136,9 +139,12 @@ export function allocatePayment(
     for (const due of dueMonths) {
         if (remainingAmount <= 0) break;
 
-        // We allocate the full monthly rate or whatever is remaining
-        // For "Smart Entry", we usually assume full months (e.g. 125, 250).
-        // If amount is 200, we pay 125 for Month 1, and 75 for Month 2 (Partial).
+        // Check if this is current month
+        const isCurrentMonth = due.year === currentYear && due.month === currentMonth;
+        const minAmount = isCurrentMonth ? 100 : 125;
+
+        // Only allocate if we have enough for minimum
+        if (remainingAmount < minAmount) break;
 
         const allocate = Math.min(remainingAmount, monthlyRate);
 

@@ -10,38 +10,27 @@ export function CardSkeleton({ count = 1 }: CardSkeletonProps) {
             {Array.from({ length: count }).map((_, index) => (
                 <div
                     key={`card-skeleton-${index}`}
-                    className="rounded-[15px] p-4 border border-[#E5D3AA]/30 bg-white/50 transition-all"
-                    style={{
-                        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.05)'
-                    }}
+                    className="p-2"
                 >
-                    <div className="flex items-start gap-4">
+                    <div
+                        className="glass-card rounded-[15px] p-4 flex items-center gap-3 relative overflow-hidden"
+                    >
                         {/* Avatar Skeleton */}
                         <Skeleton className="h-[50px] w-[50px] rounded-full bg-[#E5D3AA]/40 flex-shrink-0" />
 
                         {/* Content Skeleton */}
-                        <div className="flex-1 space-y-3">
-                            {/* Name and Icon Row */}
-                            <div className="flex items-center justify-between">
-                                <Skeleton className="h-5 w-32 bg-[#E5D3AA]/40" />
-                                <Skeleton className="h-5 w-5 rounded bg-[#E5D3AA]/30" />
-                            </div>
-
+                        <div className="flex-1 space-y-2">
+                            {/* Name */}
+                            <Skeleton className="h-4 w-32 bg-[#E5D3AA]/40" />
                             {/* Father Name */}
-                            <Skeleton className="h-4 w-24 bg-[#E5D3AA]/30" />
-
-                            {/* Stats Row */}
-                            <div className="flex items-center gap-4">
-                                <Skeleton className="h-4 w-20 bg-[#E5D3AA]/30" />
-                                <Skeleton className="h-4 w-20 bg-[#E5D3AA]/30" />
-                            </div>
-
-                            {/* Action Buttons */}
-                            <div className="flex gap-2 mt-3">
-                                <Skeleton className="h-9 flex-1 rounded-full bg-[#E5D3AA]/40" />
-                                <Skeleton className="h-9 w-24 rounded-full bg-[#E5D3AA]/40" />
-                            </div>
+                            <Skeleton className="h-[0.9rem] w-24 bg-[#E5D3AA]/30" />
                         </div>
+
+                        {/* Due Badge Skeleton */}
+                        <Skeleton className="h-7 w-12 rounded-full bg-[#E5D3AA]/40 flex-shrink-0" />
+
+                        {/* Call Button Skeleton */}
+                        <Skeleton className="h-[45px] w-[45px] rounded-full bg-[#E5D3AA]/40 flex-shrink-0" />
                     </div>
                 </div>
             ))}

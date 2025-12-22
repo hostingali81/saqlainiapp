@@ -3,12 +3,14 @@ import { UserList } from '@/components/UserList';
 import { User } from '@/types';
 import { existsSync } from 'fs';
 import path from 'path';
+import { Suspense } from 'react';
+import { CardSkeleton } from '@/components/skeletons/CardSkeleton';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 export const fetchCache = 'force-no-store';
 
-export default async function Home() {
+async function HomeContent() {
   const supabase = await createClient();
 
   const [usersResult, totalResult] = await Promise.all([
@@ -45,9 +47,35 @@ export default async function Home() {
 
   const totalAmount = totalResult.data || 0;
 
+  return <UserList initialUsers={usersWithImages} />;
+}
+
+export default function Home() {
   return (
     <main className="container max-w-md mx-auto p-4 h-screen flex flex-col bg-background">
-      <UserList initialUsers={usersWithImages} />
+      <Suspense fallback={
+        <div className="flex flex-col h-full space-y-4">
+          <div className="h-10 rounded-lg relative overflow-hidden" style={{ background: 'rgba(198, 168, 105, 0.1)' }}>
+            <div className="absolute inset-0" style={{
+              background: 'linear-gradient(90deg, transparent, rgba(198, 168, 105, 0.3), transparent)',
+              backgroundSize: '200% 100%',
+              animation: 'shimmer 1.5s infinite linear'
+            }} />
+          </div>
+          <div className="h-5 w-32 rounded relative overflow-hidden" style={{ background: 'rgba(198, 168, 105, 0.1)' }}>
+            <div className="absolute inset-0" style={{
+              background: 'linear-gradient(90deg, transparent, rgba(198, 168, 105, 0.3), transparent)',
+              backgroundSize: '200% 100%',
+              animation: 'shimmer 1.5s infinite linear'
+            }} />
+          </div>
+          <div className="flex-1 overflow-y-auto space-y-2 pb-24">
+            <CardSkeleton count={6} />
+          </div>
+        </div>
+      }>
+        <HomeContent />
+      </Suspense>
     </main>
   );
 }

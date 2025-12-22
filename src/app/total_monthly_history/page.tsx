@@ -2,9 +2,11 @@ import { createClient } from '@/lib/supabase/server';
 import { Coins, Wallet, Smartphone, HandCoins, FileText, ArrowUpCircle, TrendingUp, Calendar, Mic } from 'lucide-react';
 import { formatIndianCurrency } from '@/lib/utils';
 import Link from 'next/link';
-import { Button } from '@/components/ui/button'; // Import Indian currency formatter
+import { Button } from '@/components/ui/button';
+import { Suspense } from 'react';
+import { MonthlyHistorySkeleton } from '@/components/skeletons/MonthlyHistorySkeleton';
 
-export default async function TotalMonthlyHistory() {
+async function MonthlyHistoryContent() {
     const supabase = await createClient();
 
     // Use aggregation for totals and fetch detailed data separately
@@ -108,8 +110,7 @@ export default async function TotalMonthlyHistory() {
         });
 
     return (
-        <main className="max-w-[800px] mx-auto p-6 pb-24">
-
+        <>
             {/* Page Title */}
             <h1 className="text-2xl font-bold mb-4 text-center" style={{ color: '#0D483B' }}>
                 टोटल जमा और खर्च का हिसाब
@@ -276,6 +277,16 @@ export default async function TotalMonthlyHistory() {
                     ))}
                 </div>
             </div>
-        </main>
+        </>
+    );
+}
+
+export default function TotalMonthlyHistory() {
+    return (
+        <Suspense fallback={<MonthlyHistorySkeleton />}>
+            <main className="max-w-[800px] mx-auto p-6 pb-24">
+                <MonthlyHistoryContent />
+            </main>
+        </Suspense>
     );
 }

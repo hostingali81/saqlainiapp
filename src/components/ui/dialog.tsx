@@ -53,3 +53,7 @@ export function DialogHeader({ children }: { children: React.ReactNode }) {
 export function DialogTitle({ children, className = '' }: { children: React.ReactNode; className?: string }) {
     return <h2 className={`text-lg font-semibold ${className}`}>{children}</h2>;
 }
+
+export function DialogFooter({ children, className = '' }: { children: React.ReactNode; className?: string }) {
+    return <div className={`mt-4 flex justify-end gap-2 ${className}`}>{children}</div>;
+}

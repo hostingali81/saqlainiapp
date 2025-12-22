@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { User } from '@/types';
 import { UserCard } from './UserCard';
 import { Input } from '@/components/ui/input';
@@ -58,12 +58,6 @@ function UserCardSkeleton() {
 
 export function UserList({ initialUsers }: UserListProps) {
     const [search, setSearch] = useState('');
-    const [isLoading, setIsLoading] = useState(true);
-
-    useEffect(() => {
-        const timer = setTimeout(() => setIsLoading(false), 100);
-        return () => clearTimeout(timer);
-    }, []);
 
     const filteredUsers = useMemo(() => {
         if (!search) return initialUsers;
@@ -90,28 +84,14 @@ export function UserList({ initialUsers }: UserListProps) {
 
             {/* Stats */}
             <div className="text-sm text-muted-foreground px-1">
-                {isLoading ? (
-                    <div className="h-4 w-32 rounded relative overflow-hidden inline-block" style={{ background: 'rgba(198, 168, 105, 0.1)' }}>
-                        <div className="absolute inset-0" style={{
-                            background: 'linear-gradient(90deg, transparent, rgba(198, 168, 105, 0.3), transparent)',
-                            backgroundSize: '200% 100%',
-                            animation: 'shimmer 1.5s infinite linear'
-                        }} />
-                    </div>
-                ) : (
-                    `Showing ${filteredUsers.length} members`
-                )}
+                Showing {filteredUsers.length} members
             </div>
 
             {/* User List */}
             <div className="flex-1 overflow-y-auto space-y-2 pb-24">
-                {isLoading ? (
-                    Array.from({ length: 8 }).map((_, i) => <UserCardSkeleton key={i} />)
-                ) : (
-                    filteredUsers.map((user) => (
-                        <UserCard key={user.id} user={user} />
-                    ))
-                )}
+                {filteredUsers.map((user) => (
+                    <UserCard key={user.id} user={user} />
+                ))}
             </div>
         </div>
     );

@@ -1,6 +1,6 @@
 import { google } from 'googleapis';
 
-const SCOPES = ['https://www.googleapis.com/auth/spreadsheets.readonly'];
+const SCOPES = ['https://www.googleapis.com/auth/spreadsheets'];
 
 export async function getAuthClient() {
     const jsonKey = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
@@ -94,4 +94,29 @@ export function mapRowsToObjects(rows: any[][], mapping: Record<string, string>)
 function cleanValue(val: any) {
     if (typeof val === 'string') return val.trim();
     return val;
+}
+
+export async function appendToSheet(range: string, values: any[][]) {
+    const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+    if (!spreadsheetId) {
+        throw new Error('Missing GOOGLE_SHEET_ID in .env.local');
+    }
+
+    const auth = await getAuthClient();
+    const sheets = google.sheets({ version: 'v4', auth: auth as any });
+
+    try {
+        const response = await sheets.spreadsheets.values.append({
+            spreadsheetId,
+            range,
+            valueInputOption: 'USER_ENTERED',
+            requestBody: {
+                values
+            }
+        });
+        return response.data;
+    } catch (error: any) {
+        console.error(`Error appending to sheet range ${range}:`, error.message);
+        throw error;
+    }
 }
