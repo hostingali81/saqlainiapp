@@ -117,7 +117,7 @@ export function calculateUserFinancials(user: User, payments: Payment[]): UserFi
 /**
  * Smart Allocation Logic (FIFO)
  * Determines which months should be marked as paid given a bulk amount.
- * Current month gets 100, past months get 125 minimum.
+ * Distributes amount equally among clearable months.
  */
 export function allocatePayment(
     amount: number,
@@ -126,8 +126,6 @@ export function allocatePayment(
 ): { year: number; month: number; amount: number }[] {
 
     const allocations: { year: number; month: number; amount: number }[] = [];
-    let remainingAmount = amount;
-
     const currentYear = new Date().getFullYear();
     const currentMonth = new Date().getMonth() + 1;
 
@@ -136,25 +134,48 @@ export function allocatePayment(
         .filter(h => h.status === 'due')
         .sort((a, b) => (a.year - b.year) || (a.month - b.month));
 
-    for (const due of dueMonths) {
-        if (remainingAmount <= 0) break;
+    const hasCurrentMonth = dueMonths.some(d => d.year === currentYear && d.month === currentMonth);
+    
+    // Special case: exactly 100 and current month is due
+    if (amount === 100 && hasCurrentMonth) {
+        const current = dueMonths.find(d => d.year === currentYear && d.month === currentMonth);
+        if (current) {
+            allocations.push({
+                year: current.year,
+                month: current.month,
+                amount: 100
+            });
+        }
+        return allocations;
+    }
 
-        // Check if this is current month
-        const isCurrentMonth = due.year === currentYear && due.month === currentMonth;
-        const minAmount = isCurrentMonth ? 100 : 125;
+    // Calculate how many months can be cleared with minimum amounts
+    let remaining = amount;
+    let clearableMonths = 0;
+    for (let i = 0; i < dueMonths.length; i++) {
+        const isCurrent = dueMonths[i].year === currentYear && dueMonths[i].month === currentMonth;
+        const min = isCurrent ? 100 : 125;
+        if (remaining >= min) {
+            remaining -= min;
+            clearableMonths++;
+        } else {
+            break;
+        }
+    }
 
-        // Only allocate if we have enough for minimum
-        if (remainingAmount < minAmount) break;
-
-        const allocate = Math.min(remainingAmount, monthlyRate);
-
-        allocations.push({
-            year: due.year,
-            month: due.month,
-            amount: allocate
-        });
-
-        remainingAmount -= allocate;
+    // Distribute amount equally among clearable months
+    if (clearableMonths > 0) {
+        const perMonth = Math.floor(amount / clearableMonths);
+        const remainder = amount % clearableMonths;
+        
+        for (let i = 0; i < clearableMonths; i++) {
+            const allocAmount = perMonth + (i < remainder ? 1 : 0);
+            allocations.push({
+                year: dueMonths[i].year,
+                month: dueMonths[i].month,
+                amount: allocAmount
+            });
+        }
     }
 
     return allocations;
