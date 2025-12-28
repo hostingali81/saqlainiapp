@@ -21,7 +21,8 @@ export function PhotoManagement({ users }: PhotoManagementProps) {
     // Convert users to options format
     const userOptions = users.map(u => ({
         value: u.id.toString(),
-        label: `${u.name} - ${u.fname}`
+        label: `${u.name} - ${u.fname}`,
+        image: u.hasImage ? `/upload/small_image/${u.id}.jpg` : `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name)}&size=32&background=0D483B&color=FFF8E7&bold=true`
     }));
 
     const hasImage = selectedUser?.hasImage;

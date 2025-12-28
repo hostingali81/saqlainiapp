@@ -134,6 +134,16 @@ export function allocatePayment(
         .filter(h => h.status === 'due')
         .sort((a, b) => (a.year - b.year) || (a.month - b.month));
 
+    // If no due months, allocate to current month
+    if (dueMonths.length === 0) {
+        allocations.push({
+            year: currentYear,
+            month: currentMonth,
+            amount: amount
+        });
+        return allocations;
+    }
+
     const hasCurrentMonth = dueMonths.some(d => d.year === currentYear && d.month === currentMonth);
     
     // Special case: exactly 100 and current month is due

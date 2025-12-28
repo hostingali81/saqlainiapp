@@ -4,14 +4,15 @@ import { useState, useRef, useEffect } from 'react';
 import { Search, ChevronDown } from 'lucide-react';
 
 interface SearchableSelectProps {
-    options: { value: string; label: string }[];
+    options: { value: string; label: string; image?: string }[];
     value: string;
     onChange: (value: string) => void;
     placeholder?: string;
     className?: string;
+    onNewEntry?: () => void;
 }
 
-export function SearchableSelect({ options, value, onChange, placeholder = "Select...", className = "" }: SearchableSelectProps) {
+export function SearchableSelect({ options, value, onChange, placeholder = "Select...", className = "", onNewEntry }: SearchableSelectProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const containerRef = useRef<HTMLDivElement>(null);
@@ -82,8 +83,21 @@ export function SearchableSelect({ options, value, onChange, placeholder = "Sele
                     {/* Options List */}
                     <div className="max-h-60 overflow-y-auto">
                         {filteredOptions.length === 0 ? (
-                            <div className="px-4 py-6 text-center text-sm text-muted-foreground">
-                                No results found
+                            <div className="px-4 py-4 text-center">
+                                <p className="text-sm text-muted-foreground mb-3">No results found</p>
+                                {onNewEntry && (
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            onNewEntry();
+                                            setIsOpen(false);
+                                            setSearchQuery('');
+                                        }}
+                                        className="w-full px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm font-medium"
+                                    >
+                                        + Add New Entry
+                                    </button>
+                                )}
                             </div>
                         ) : (
                             filteredOptions.map((option) => (
@@ -91,10 +105,15 @@ export function SearchableSelect({ options, value, onChange, placeholder = "Sele
                                     key={option.value}
                                     type="button"
                                     onClick={() => handleSelect(option.value)}
-                                    className={`w-full text-left px-4 py-2 hover:bg-accent hover:text-white ${option.value === value ? 'bg-accent text-white font-medium' : ''
+                                    className={`w-full text-left px-4 py-2 hover:bg-accent hover:text-white flex items-center gap-2 ${option.value === value ? 'bg-accent text-white font-medium' : ''
                                         }`}
                                 >
-                                    {option.label}
+                                    <img
+                                        src={option.image}
+                                        alt=""
+                                        className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                                    />
+                                    <span className="flex-1">{option.label}</span>
                                 </button>
                             ))
                         )}

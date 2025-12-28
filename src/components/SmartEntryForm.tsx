@@ -7,8 +7,9 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { processSmartPayment, getUserProfile } from '@/app/actions/user';
-import { Check } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { processSmartPayment, getUserProfile, createNewUserPayment } from '@/app/actions/user';
+import { Check, UserPlus } from 'lucide-react';
 
 interface SmartEntryFormProps {
     users: User[];
@@ -21,11 +22,22 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
     const [remarks, setRemarks] = useState<Record<string, string>>({});
     const [globalRemark, setGlobalRemark] = useState<string>('');
     const [showRemarkDialog, setShowRemarkDialog] = useState(false);
+    const [showNewEntryForm, setShowNewEntryForm] = useState(false);
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState<{ success?: boolean; allocated?: any[]; error?: string } | null>(null);
     const [dueMonths, setDueMonths] = useState<MonthStatus[]>([]);
     const [loadingMonths, setLoadingMonths] = useState(false);
     const [allocatedMonths, setAllocatedMonths] = useState<Array<{month: MonthStatus, amount: number}>>([]);
+    
+    // New Entry Form States
+    const [newEntryData, setNewEntryData] = useState({
+        name: '',
+        fname: '',
+        phone: '',
+        amount: '',
+        frequency: 'Regular' as 'Regular' | 'One Time',
+        remarks: ''
+    });
 
     const selectedUser = users.find(u => u.id.toString() === selectedUserId);
 
@@ -47,10 +59,17 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
         }
     }, [selectedUserId]);
 
-    const userOptions = users.map(u => ({
-        value: u.id.toString(),
-        label: `${u.name} (${u.bakaya_month} Due)`
-    }));
+    const userOptions = users
+        .sort((a, b) => {
+            if (a.frequency === 'Regular' && b.frequency === 'One Time') return -1;
+            if (a.frequency === 'One Time' && b.frequency === 'Regular') return 1;
+            return 0;
+        })
+        .map(u => ({
+            value: u.id.toString(),
+            label: `${u.name} - ${u.fname} (${u.bakaya_month} Due)`,
+            image: u.hasImage ? `/upload/small_image/${u.id}.jpg` : `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name)}&size=32&background=0D483B&color=FFF8E7&bold=true`
+        }));
 
     const calculateAllocations = () => {
         const allocated: Array<{month: MonthStatus, amount: number}> = [];
@@ -59,6 +78,22 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
         const currentYear = new Date().getFullYear();
         const currentMonth = new Date().getMonth() + 1;
         const totalAmount = parseInt(amount);
+        
+        // If no due months OR user is One Time, allocate to current month
+        if (dueMonths.length === 0 || selectedUser?.frequency === 'One Time') {
+            const monthName = new Date(currentYear, currentMonth - 1).toLocaleString('default', { month: 'long' });
+            allocated.push({
+                month: {
+                    year: currentYear,
+                    month: currentMonth,
+                    monthName: monthName,
+                    amount: totalAmount,
+                    status: 'paid'
+                },
+                amount: totalAmount
+            });
+            return allocated;
+        }
         
         const hasCurrentMonth = dueMonths.some(d => d.year === currentYear && d.month === currentMonth);
         
@@ -129,6 +164,37 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
         setRemarks(newRemarks);
     };
 
+    const handleNewEntrySubmit = async () => {
+        if (!newEntryData.name || !newEntryData.fname || !newEntryData.phone || !newEntryData.amount) {
+            setResult({ error: 'Please fill all required fields' });
+            return;
+        }
+
+        setLoading(true);
+        setResult(null);
+
+        try {
+            const res = await createNewUserPayment(newEntryData);
+            setResult(res);
+            if (res.success) {
+                setNewEntryData({
+                    name: '',
+                    fname: '',
+                    phone: '',
+                    amount: '',
+                    frequency: 'Regular',
+                    remarks: ''
+                });
+                setShowNewEntryForm(false);
+                onPaymentSuccess?.();
+            }
+        } catch (e) {
+            setResult({ error: 'An unexpected error occurred.' });
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <>
             <Card className="w-full max-w-lg mx-auto border-t-4 border-t-secondary">
@@ -144,12 +210,99 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
                             onChange={(value) => {
                                 setSelectedUserId(value);
                                 setResult(null);
+                                setShowNewEntryForm(false);
                             }}
                             placeholder="Search and select user..."
+                            onNewEntry={() => setShowNewEntryForm(true)}
                         />
                     </div>
 
-                    {selectedUser && (
+                    {showNewEntryForm && (
+                        <div className="space-y-3 p-4 bg-gray-50 rounded-md border border-gray-200">
+                            <h4 className="text-sm font-semibold text-gray-700">New User Payment Entry</h4>
+                            
+                            <div className="space-y-2">
+                                <label className="text-xs font-medium">Name *</label>
+                                <Input
+                                    type="text"
+                                    placeholder="Enter name"
+                                    value={newEntryData.name}
+                                    onChange={(e) => setNewEntryData({...newEntryData, name: e.target.value})}
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-xs font-medium">Father Name *</label>
+                                <Input
+                                    type="text"
+                                    placeholder="Enter father name"
+                                    value={newEntryData.fname}
+                                    onChange={(e) => setNewEntryData({...newEntryData, fname: e.target.value})}
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-xs font-medium">Mobile No *</label>
+                                <Input
+                                    type="tel"
+                                    placeholder="Enter mobile number"
+                                    value={newEntryData.phone}
+                                    onChange={(e) => setNewEntryData({...newEntryData, phone: e.target.value})}
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-xs font-medium">Amount (₹) *</label>
+                                <Input
+                                    type="number"
+                                    placeholder="Enter amount"
+                                    value={newEntryData.amount}
+                                    onChange={(e) => setNewEntryData({...newEntryData, amount: e.target.value})}
+                                />
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-xs font-medium">Payment Frequency *</label>
+                                <Select
+                                    value={newEntryData.frequency}
+                                    onValueChange={(value: 'Regular' | 'One Time') => setNewEntryData({...newEntryData, frequency: value})}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="Regular">Regular</SelectItem>
+                                        <SelectItem value="One Time">One Time</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div className="space-y-2">
+                                <label className="text-xs font-medium">Remarks</label>
+                                <Input
+                                    type="text"
+                                    placeholder="Optional remarks"
+                                    value={newEntryData.remarks}
+                                    onChange={(e) => setNewEntryData({...newEntryData, remarks: e.target.value})}
+                                />
+                            </div>
+
+                            <Button
+                                className="w-full bg-green-600 hover:bg-green-700"
+                                disabled={loading}
+                                onClick={handleNewEntrySubmit}
+                            >
+                                {loading ? 'Processing...' : (
+                                    <>
+                                        <Check className="mr-2 h-4 w-4" />
+                                        Submit New Entry
+                                    </>
+                                )}
+                            </Button>
+                        </div>
+                    )}
+
+                    {!showNewEntryForm && selectedUser && (
                         <div className="bg-muted p-3 rounded-md text-sm grid grid-cols-2 gap-2">
                             <div>
                                 <span className="text-muted-foreground">Total Due Months:</span>
@@ -162,22 +315,24 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
                         </div>
                     )}
 
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium">Paid Amount (₹)</label>
-                        <Input
-                            type="number"
-                            placeholder="e.g. 500"
-                            value={amount}
-                            onChange={(e) => setAmount(e.target.value)}
-                        />
-                        {amount && (
-                            <p className="text-xs text-muted-foreground">
-                                Will clear approx <strong>{Math.floor(parseInt(amount) / 125)}</strong> months.
-                            </p>
-                        )}
-                    </div>
+                    {!showNewEntryForm && (
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Paid Amount (₹)</label>
+                            <Input
+                                type="number"
+                                placeholder="e.g. 500"
+                                value={amount}
+                                onChange={(e) => setAmount(e.target.value)}
+                            />
+                            {amount && (
+                                <p className="text-xs text-muted-foreground">
+                                    Will clear approx <strong>{Math.floor(parseInt(amount) / 125)}</strong> months.
+                                </p>
+                            )}
+                        </div>
+                    )}
 
-                    {selectedUser && (
+                    {!showNewEntryForm && selectedUser && selectedUser.frequency !== 'One Time' && (
                         loadingMonths ? (
                             <div className="text-sm text-muted-foreground text-center p-2">Loading due months...</div>
                         ) : dueMonths.length > 0 ? (
@@ -217,21 +372,59 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
                                     })}
                                 </div>
                             </div>
+                        ) : amount && parseInt(amount) > 0 ? (
+                            <div className="bg-green-50 border border-green-200 rounded-md p-3">
+                                <p className="text-sm font-semibold text-green-800 mb-2">Payment Allocation:</p>
+                                <div className="flex flex-wrap gap-2">
+                                    {(() => {
+                                        const allocated = calculateAllocations();
+                                        return allocated.map((a, idx) => (
+                                            <span 
+                                                key={idx}
+                                                className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700"
+                                            >
+                                                {a.month.monthName} {a.month.year} - ₹{a.amount}
+                                            </span>
+                                        ));
+                                    })()}
+                                </div>
+                            </div>
                         ) : null
                     )}
 
-                    <Button
-                        className="w-full bg-primary hover:bg-primary/90"
-                        disabled={!selectedUserId || !amount || loading}
-                        onClick={handlePayment}
-                    >
-                        {loading ? 'Processing...' : (
-                            <>
-                                <Check className="mr-2 h-4 w-4" />
-                                Auto-Allocate Payment
-                            </>
-                        )}
-                    </Button>
+                    {!showNewEntryForm && selectedUser && selectedUser.frequency === 'One Time' && amount && parseInt(amount) > 0 && (
+                        <div className="bg-green-50 border border-green-200 rounded-md p-3">
+                            <p className="text-sm font-semibold text-green-800 mb-2">Payment Allocation:</p>
+                            <div className="flex flex-wrap gap-2">
+                                {(() => {
+                                    const allocated = calculateAllocations();
+                                    return allocated.map((a, idx) => (
+                                        <span 
+                                            key={idx}
+                                            className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700"
+                                        >
+                                            {a.month.monthName} {a.month.year} - ₹{a.amount}
+                                        </span>
+                                    ));
+                                })()}
+                            </div>
+                        </div>
+                    )}
+
+                    {!showNewEntryForm && (
+                        <Button
+                            className="w-full bg-primary hover:bg-primary/90"
+                            disabled={!selectedUserId || !amount || loading}
+                            onClick={handlePayment}
+                        >
+                            {loading ? 'Processing...' : (
+                                <>
+                                    <Check className="mr-2 h-4 w-4" />
+                                    {dueMonths.length > 0 ? 'Clear Due Months' : 'Add Payment'}
+                                </>
+                            )}
+                        </Button>
+                    )}
 
                     {result && (
                         <div className={`p-3 rounded-md text-sm ${result.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>

@@ -1,17 +1,23 @@
-import { MonthStatus } from '@/types';
+import { MonthStatus, Payment } from '@/types';
 import { cn } from '@/lib/utils';
 
 interface PaymentTimelineProps {
     history: MonthStatus[];
+    payments: Payment[];
     frequency?: string;
 }
 
-export function PaymentTimeline({ history, frequency }: PaymentTimelineProps) {
+export function PaymentTimeline({ history, payments, frequency }: PaymentTimelineProps) {
     // Filter history based on frequency (Match PHP Logic)
     const filteredHistory = history.filter(item => {
         if ((frequency === 'Not Regular' || frequency === 'One Time') && item.status === 'due') return false;
         return true;
     });
+
+    // Group payments by month-year
+    const getPaymentsForMonth = (year: number, month: number) => {
+        return payments.filter(p => p.year === year && p.month === month);
+    };
 
     return (
         <div>
@@ -47,14 +53,26 @@ export function PaymentTimeline({ history, frequency }: PaymentTimelineProps) {
                     </div>
 
                     {/* Amount/Status */}
-                    <div>
+                    <div className="flex flex-col items-end gap-1">
                         {item.status === 'paid' ? (
-                            <span
-                                className="font-bold text-base"
-                                style={{ color: '#0D483B' }}
-                            >
-                                ₹{item.amount}
-                            </span>
+                            <>
+                                <span
+                                    className="font-bold text-base"
+                                    style={{ color: '#0D483B' }}
+                                >
+                                    ₹{item.amount}
+                                </span>
+                                {(() => {
+                                    const monthPayments = getPaymentsForMonth(item.year, item.month);
+                                    return monthPayments.length > 1 ? (
+                                        <div className="text-xs" style={{ color: '#165E4B' }}>
+                                            {monthPayments.map((p, i) => (
+                                                <div key={p.id || i}>₹{p.amount}</div>
+                                            ))}
+                                        </div>
+                                    ) : null;
+                                })()}
+                            </>
                         ) : (
                             <span
                                 className="font-bold text-xs px-3 py-1 rounded-[12px]"

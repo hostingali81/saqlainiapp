@@ -27,7 +27,7 @@ async function ProfileContent({ id }: { id: string }) {
     const result = await getUserProfile(userId);
     if ('error' in result) notFound();
 
-    const { user, financials } = result;
+    const { user, financials, payments } = result;
     if (!user || !financials) notFound();
 
     // Check if image exists
@@ -205,6 +205,7 @@ async function ProfileContent({ id }: { id: string }) {
 
                 <PaymentTimeline
                     history={financials.history}
+                    payments={payments || []}
                     frequency={user.frequency === 'One Time' ? 'Not Regular' : user.frequency}
                 />
             </div>

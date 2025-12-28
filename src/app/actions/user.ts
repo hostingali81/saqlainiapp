@@ -35,7 +35,7 @@ export async function getUserProfile(userId: number) {
 
     const financials = calculateUserFinancials(user, payments);
 
-    return { user, financials };
+    return { user, financials, payments };
 }
 
 export async function processSmartPayment(userId: number, amount: number, remarks: Record<string, string> = {}) {
@@ -55,7 +55,7 @@ export async function processSmartPayment(userId: number, amount: number, remark
     const allocations = allocatePayment(amount, financials.history);
 
     if (allocations.length === 0) {
-        return { error: 'No due months to allocate payment to.' };
+        return { error: 'Unable to allocate payment.' };
     }
 
     // 3. Insert Payments - Get max ID first
@@ -123,4 +123,51 @@ export async function processSmartPayment(userId: number, amount: number, remark
     revalidatePath('/');
     revalidatePath(`/profile/${userId}`);
     return { success: true, allocated: allocations };
+}
+
+export async function createNewUserPayment(data: {
+    name: string;
+    fname: string;
+    phone: string;
+    amount: string;
+    frequency: 'Regular' | 'One Time';
+    remarks: string;
+}) {
+    const currentYear = new Date().getFullYear();
+    const currentMonth = new Date().getMonth() + 1;
+    const amount = parseInt(data.amount);
+
+    if (!data.name || !data.fname || !data.phone || amount <= 0) {
+        return { error: 'Invalid input data' };
+    }
+
+    // Add to Google Sheet only
+    try {
+        const now = new Date();
+        const timestamp = now.toLocaleString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).replace(',', '');
+        const paymentDate = now.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
+        const monthFormatted = new Date(currentYear, currentMonth - 1).toLocaleString('en-US', { month: 'short', year: '2-digit' });
+        
+        const row = [
+            timestamp,
+            `${data.name} / ${data.fname}`,
+            paymentDate,
+            amount,
+            currentMonth,
+            monthFormatted,
+            currentYear,
+            data.phone,
+            data.remarks || '',
+            '', // Payment Screenshot Upload - blank
+            data.frequency // EntryPayment Frequency
+        ];
+        
+        await appendToSheet('FormResponses!A:K', [row]);
+    } catch (sheetError) {
+        console.error('Failed to add to Google Sheet:', sheetError);
+        return { error: 'Failed to add entry to Google Sheet' };
+    }
+
+    revalidatePath('/');
+    return { success: true };
 }

@@ -26,10 +26,15 @@ export default async function PhotosPage() {
         return <div>Error loading users.</div>;
     }
 
-    const usersWithImages = (users as User[]).map(user => ({
-        ...user,
-        hasImage: false
-    }));
+    const usersWithImages = (users as User[]).map(user => {
+        const fs = require('fs');
+        const path = require('path');
+        const imagePath = path.join(process.cwd(), 'public', 'upload', 'small_image', `${user.id}.jpg`);
+        return {
+            ...user,
+            hasImage: fs.existsSync(imagePath)
+        };
+    });
 
     return (
         <main className="container max-w-lg mx-auto p-4 min-h-screen bg-background pb-24">
