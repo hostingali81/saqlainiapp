@@ -4,7 +4,7 @@ import { PaymentEntriesTable } from '@/components/PaymentEntriesTable';
 import { Button } from '@/components/ui/button';
 import { User } from '@/types';
 import Link from 'next/link';
-import { Camera, RefreshCw } from 'lucide-react';
+import { Camera, RefreshCw, FileText, DollarSign } from 'lucide-react';
 import { LogoutButton } from '@/components/LogoutButton';
 import { redirect } from 'next/navigation';
 import { AdminPageClient } from '@/components/admin/AdminPageClient';
@@ -43,16 +43,28 @@ export default async function AdminPage() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
                 <h1 className="text-2xl font-bold text-primary font-serif">Admin Dashboard</h1>
                 <div className="flex flex-wrap gap-2">
+                    <Link href="/admin/form-chanda">
+                        <Button variant="outline" size="sm">
+                            <FileText className="h-4 w-4 mr-2" />
+                            Chanda
+                        </Button>
+                    </Link>
+                    <Link href="/admin/form-expenses">
+                        <Button variant="outline" size="sm">
+                            <DollarSign className="h-4 w-4 mr-2" />
+                            Expenses
+                        </Button>
+                    </Link>
                     <Link href="/admin/admin/sync">
                         <Button variant="outline" size="sm">
-                            <RefreshCw className="h-4 w-4 sm:mr-2" />
-                            <span className="hidden sm:inline">Sync</span>
+                            <RefreshCw className="h-4 w-4 mr-2" />
+                            Sync
                         </Button>
                     </Link>
                     <Link href="/admin/photos">
                         <Button variant="outline" size="sm">
-                            <Camera className="h-4 w-4 sm:mr-2" />
-                            <span className="hidden sm:inline">Photos</span>
+                            <Camera className="h-4 w-4 mr-2" />
+                            Photos
                         </Button>
                     </Link>
                     <LogoutButton variant="outline" size="sm" />

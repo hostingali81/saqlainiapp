@@ -10,9 +10,10 @@ interface SearchableSelectProps {
     placeholder?: string;
     className?: string;
     onNewEntry?: () => void;
+    showImages?: boolean;
 }
 
-export function SearchableSelect({ options, value, onChange, placeholder = "Select...", className = "", onNewEntry }: SearchableSelectProps) {
+export function SearchableSelect({ options, value, onChange, placeholder = "Select...", className = "", onNewEntry, showImages = true }: SearchableSelectProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
     const containerRef = useRef<HTMLDivElement>(null);
@@ -108,11 +109,13 @@ export function SearchableSelect({ options, value, onChange, placeholder = "Sele
                                     className={`w-full text-left px-4 py-2 hover:bg-accent hover:text-white flex items-center gap-2 ${option.value === value ? 'bg-accent text-white font-medium' : ''
                                         }`}
                                 >
-                                    <img
-                                        src={option.image}
-                                        alt=""
-                                        className="w-8 h-8 rounded-full object-cover flex-shrink-0"
-                                    />
+                                    {showImages && option.image && (
+                                        <img
+                                            src={option.image}
+                                            alt=""
+                                            className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                                        />
+                                    )}
                                     <span className="flex-1">{option.label}</span>
                                 </button>
                             ))
