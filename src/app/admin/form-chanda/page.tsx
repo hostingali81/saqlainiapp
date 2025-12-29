@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { FormChandaClient } from '@/components/admin/FormChandaClient';
 import { getSheetData } from '@/lib/sheets';
+import { AdminNav } from '@/components/admin/AdminNav';
 
 export default async function FormChandaPage() {
     const supabase = await createClient();

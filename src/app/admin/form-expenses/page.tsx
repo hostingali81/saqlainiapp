@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { FormExpensesClient } from '@/components/admin/FormExpensesClient';
 import { getSheetData } from '@/lib/sheets';
+import { AdminNav } from '@/components/admin/AdminNav';
 
 export default async function FormExpensesPage() {
     const supabase = await createClient();

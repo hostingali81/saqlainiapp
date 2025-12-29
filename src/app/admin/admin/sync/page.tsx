@@ -1,10 +1,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { SyncControls } from '@/components/admin/SyncControls';
-import { LogoutButton } from '@/components/LogoutButton';
 import { redirect } from 'next/navigation';
-import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { AdminNav } from '@/components/admin/AdminNav';
 
 export const revalidate = 0;
 
@@ -18,16 +15,9 @@ export default async function SyncPage() {
 
     return (
         <main className="container max-w-md mx-auto p-4 min-h-screen bg-background pb-24">
-            <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-2">
-                    <Link href="/admin">
-                        <Button variant="ghost" size="sm">
-                            <ArrowLeft className="h-4 w-4" />
-                        </Button>
-                    </Link>
-                    <h1 className="text-2xl font-bold text-primary font-serif">Manual Data Sync</h1>
-                </div>
-                <LogoutButton variant="outline" size="sm" />
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
+                <h1 className="text-2xl font-bold text-primary font-serif">Manual Data Sync</h1>
+                <AdminNav />
             </div>
 
             <SyncControls />

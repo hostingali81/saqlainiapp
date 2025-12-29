@@ -1,11 +1,8 @@
 import { createClient } from '@/lib/supabase/server';
 import { PhotoManagement } from '@/components/PhotoManagement';
-import { Button } from '@/components/ui/button';
 import { User } from '@/types';
-import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
-import { LogoutButton } from '@/components/LogoutButton';
 import { redirect } from 'next/navigation';
+import { AdminNav } from '@/components/admin/AdminNav';
 
 export const revalidate = 0;
 
@@ -38,16 +35,9 @@ export default async function PhotosPage() {
 
     return (
         <main className="container max-w-lg mx-auto p-4 min-h-screen bg-background pb-24">
-            <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-3">
-                    <Link href="/admin">
-                        <Button variant="outline" size="icon">
-                            <ArrowLeft className="h-4 w-4" />
-                        </Button>
-                    </Link>
-                    <h1 className="text-2xl font-bold text-primary font-serif">Photo Management</h1>
-                </div>
-                <LogoutButton variant="outline" size="sm" />
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
+                <h1 className="text-2xl font-bold text-primary font-serif">Photo Management</h1>
+                <AdminNav />
             </div>
 
             <PhotoManagement users={usersWithImages} />

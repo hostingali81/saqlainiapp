@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Edit, Trash2 } from 'lucide-react';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { AdminNav } from '@/components/admin/AdminNav';
 
 interface FormChandaClientProps {
     existingNames: Array<{ name: string; nameHindi: string }>;
@@ -115,8 +116,11 @@ export function FormChandaClient({ existingNames }: FormChandaClientProps) {
     }));
 
     return (
-        <main className="max-w-[1200px] mx-auto p-6">
-            <h1 className="text-2xl font-bold mb-6" style={{ color: '#0D483B' }}>Form Chanda Entry</h1>
+        <main className="container max-w-md mx-auto p-4 min-h-screen bg-background pb-24">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
+                <h1 className="text-2xl font-bold" style={{ color: '#0D483B' }}>Form Chanda Entry</h1>
+                <AdminNav />
+            </div>
 
             <form onSubmit={handleSubmit} className="space-y-4 rounded-[15px] p-6 mb-6" style={{ background: '#FFF8E7', border: '1px solid #E5D3AA' }}>
                 <div className="space-y-2">
