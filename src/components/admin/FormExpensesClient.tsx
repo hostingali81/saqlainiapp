@@ -284,7 +284,7 @@ export function FormExpensesClient({ existingNames }: FormExpensesClientProps) {
             </div>
 
             <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-                <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+                <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[85vh] overflow-y-auto">
                     <DialogHeader>
                         <DialogTitle>Edit Expense Entry</DialogTitle>
                     </DialogHeader>

@@ -40,7 +40,7 @@ export function Dialog({ open, onOpenChange, children }: SimpleDialogProps) {
 
 export function DialogContent({ children, className = '' }: { children: React.ReactNode; className?: string }) {
     return (
-        <div className={`relative bg-white rounded-lg shadow-xl max-w-lg w-full mx-4 p-6 ${className}`}>
+        <div className={`relative bg-white rounded-lg shadow-xl max-w-lg w-full mx-auto p-4 sm:p-6 ${className}`}>
             {children}
         </div>
     );
