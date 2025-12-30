@@ -20,6 +20,7 @@ export function ChandaForm() {
     const [stats, setStats] = useState<ChandaStats | null>(null);
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(true);
+    const [isExporting, setIsExporting] = useState(false);
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -37,7 +38,10 @@ export function ChandaForm() {
     };
 
     const exportToPDF = async () => {
+        if (!confirm("Are you sure you want to download the PDF?")) return;
+
         try {
+            setIsExporting(true);
             console.log('Starting PDF export with Hindi font support...');
 
             // Load fonts
@@ -131,7 +135,8 @@ export function ChandaForm() {
                                     { text: 'Last Date', style: 'tableHeader', alignment: 'center' },
                                     { text: 'Remarks', style: 'tableHeader' }
                                 ],
-                                ...groups.map((group, index) => [
+                                // Sort groups by totalAmount descending (highest first)
+                                ...[...groups].sort((a, b) => b.totalAmount - a.totalAmount).map((group, index) => [
                                     { text: (index + 1).toString(), alignment: 'center' },
                                     { text: group.name },
                                     {
@@ -188,7 +193,10 @@ export function ChandaForm() {
 
             // CRITICAL: Pass VFS and fonts directly to createPdf
             // Signature: createPdf(docDefinition, tableLayouts, fonts, vfs)
-            (pdfMake as any).createPdf(docDefinition, null, customFonts, vfs).download(`Chanda_Records_${new Date().toISOString().split('T')[0]}.pdf`);
+            (pdfMake as any).createPdf(docDefinition, null, customFonts, vfs).download(
+                `Chanda_Records_${new Date().toISOString().split('T')[0]}.pdf`,
+                () => setIsExporting(false) // Callback when done
+            );
 
         } catch (error) {
             console.error('Error generating PDF with Hindi fonts:', error);
@@ -198,14 +206,12 @@ export function ChandaForm() {
                 // Reset to default VFS (best effort)
                 (pdfMake as any).vfs = (pdfFonts as any).pdfMake?.vfs || (pdfMake as any).vfs || pdfFonts;
 
-                // Fallback document using default fonts
                 const fallbackDocDef: any = {
                     pageSize: 'A4',
                     pageMargins: [40, 60, 40, 60],
                     defaultStyle: {
                         fontSize: 10,
                         color: '#4A3728'
-                        // font: 'Roboto' (default)
                     },
                     content: [
                         { text: 'Chanda Records', style: 'header', alignment: 'center', margin: [0, 0, 0, 5] },
@@ -216,7 +222,6 @@ export function ChandaForm() {
                             alignment: 'center',
                             margin: [0, 0, 0, 20]
                         },
-                        // We can reuse the same content structure, rely on default font
                         {
                             table: {
                                 headerRows: 1,
@@ -231,7 +236,7 @@ export function ChandaForm() {
                                     ],
                                     ...groups.map((group, index) => [
                                         { text: (index + 1).toString(), alignment: 'center' },
-                                        { text: group.name }, // This might show squares if Hindi
+                                        { text: group.name },
                                         { text: `₹${formatIndianCurrency(group.totalAmount)}`, alignment: 'right', bold: true, color: '#059669' },
                                         { text: group.latestDate, alignment: 'center' },
                                         { text: group.latestRemarks || '-' }
@@ -252,11 +257,15 @@ export function ChandaForm() {
                 };
 
                 alert('Could not load Hindi fonts. Downloading version with default fonts (Hindi text may be broken).');
-                (pdfMake as any).createPdf(fallbackDocDef).download(`Chanda_Records_Fallback_${new Date().toISOString().split('T')[0]}.pdf`);
+                (pdfMake as any).createPdf(fallbackDocDef).download(
+                    `Chanda_Records_Fallback_${new Date().toISOString().split('T')[0]}.pdf`,
+                    () => setIsExporting(false) // Callback
+                );
 
             } catch (fallbackError) {
                 console.error('Even fallback failed', fallbackError);
                 alert('Failed to generate PDF. Please check console.');
+                setIsExporting(false);
             }
         }
     };
@@ -268,15 +277,15 @@ export function ChandaForm() {
                 <h1 className="text-2xl font-bold" style={{ color: '#0D483B' }}>Chanda Records</h1>
                 <Button
                     onClick={exportToPDF}
-                    disabled={loading || groups.length === 0}
+                    disabled={loading || groups.length === 0 || isExporting}
                     className="rounded-[15px]"
                     style={{
                         background: 'linear-gradient(135deg, #0D483B, #165E4B)',
                         color: '#FFF8E7'
                     }}
                 >
-                    <FileDown className="h-4 w-4 mr-2" />
-                    Export PDF
+                    <FileDown className={`h-4 w-4 mr-2 ${isExporting ? 'animate-pulse' : ''}`} />
+                    {isExporting ? 'Generating...' : 'Export PDF'}
                 </Button>
             </div>
 

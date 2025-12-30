@@ -19,9 +19,13 @@ export function ExpensesForm() {
     const [page, setPage] = useState(1);
     const [total, setTotal] = useState(0);
     const [loading, setLoading] = useState(true);
+    const [isExporting, setIsExporting] = useState(false);
 
     const exportToPDF = async () => {
+        if (!confirm("Are you sure you want to download the Expense PDF?")) return;
+
         try {
+            setIsExporting(true);
             console.log('Starting PDF export with Hindi font support...');
 
             // Load fonts
@@ -170,11 +174,15 @@ export function ExpensesForm() {
             };
 
             // CRITICAL: Pass VFS and fonts directly to createPdf
-            (pdfMake as any).createPdf(docDefinition, null, customFonts, vfs).download(`Expense_Records_${new Date().toISOString().split('T')[0]}.pdf`);
+            (pdfMake as any).createPdf(docDefinition, null, customFonts, vfs).download(
+                `Expense_Records_${new Date().toISOString().split('T')[0]}.pdf`,
+                () => setIsExporting(false) // Callback when done
+            );
 
         } catch (error) {
             console.error('Error generating PDF:', error);
             alert('Failed to generate PDF. Please check console.');
+            setIsExporting(false);
         }
     };
 
@@ -208,15 +216,15 @@ export function ExpensesForm() {
                 <h1 className="text-2xl font-bold" style={{ color: '#0D483B' }}>Expenses</h1>
                 <Button
                     onClick={exportToPDF}
-                    disabled={loading || expenses.length === 0}
+                    disabled={loading || expenses.length === 0 || isExporting}
                     className="rounded-[15px]"
                     style={{
                         background: 'linear-gradient(135deg, #0D483B, #165E4B)',
                         color: '#FFF8E7'
                     }}
                 >
-                    <FileDown className="h-4 w-4 mr-2" />
-                    Export PDF
+                    <FileDown className={`h-4 w-4 mr-2 ${isExporting ? 'animate-pulse' : ''}`} />
+                    {isExporting ? 'Generating...' : 'Export PDF'}
                 </Button>
             </div>
 
