@@ -45,6 +45,7 @@ export interface Expense {
     Category?: string; // Added Category
     Amount: number;
     Remarks?: string;
+    Head?: string; // Added Head (SaqlainiApp or Chanda)
 }
 
 export interface ChandaEntry {

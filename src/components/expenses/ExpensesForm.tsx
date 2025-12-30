@@ -233,6 +233,11 @@ export function ExpensesForm() {
                                         </div>
                                         <p className="text-xs" style={{ color: '#165E4B' }}>
                                             {expense.PaymentDate} {expense.Remarks ? `• ${expense.Remarks}` : ''}
+                                            {expense.Head && (
+                                                <span className="ml-2" style={{ color: '#8B7355', fontStyle: 'italic' }}>
+                                                    • {expense.Head}
+                                                </span>
+                                            )}
                                         </p>
                                     </div>
                                     <span className="font-mono font-bold text-red-600 text-lg">

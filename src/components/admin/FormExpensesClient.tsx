@@ -241,9 +241,9 @@ export function FormExpensesClient({ existingNames }: FormExpensesClientProps) {
                 {message && <p className={`text-sm ${message.startsWith('✓') ? 'text-green-600' : 'text-red-600'}`}>{message}</p>}
             </form>
 
-            <div className="rounded-[15px] overflow-hidden" style={{ background: '#FFF8E7', border: '1px solid #E5D3AA' }}>
+            <div className="rounded-[15px] overflow-hidden mb-6" style={{ background: '#FFF8E7', border: '1px solid #E5D3AA' }}>
                 <div className="overflow-x-auto">
-                    <table className="w-full">
+                    <table className="w-full" style={{ minWidth: '800px' }}>
                         <thead>
                             <tr style={{ background: '#E5D3AA' }}>
                                 <th className="text-left p-3 text-sm font-bold" style={{ color: '#4A3728' }}>Timestamp</th>
@@ -269,7 +269,7 @@ export function FormExpensesClient({ existingNames }: FormExpensesClientProps) {
                                     <td className="p-3 text-xs" style={{ color: '#165E4B' }}>{entry.paymentDate}</td>
                                     <td className="p-3 text-xs font-bold" style={{ color: '#059669' }}>₹{entry.amount}</td>
                                     <td className="p-3 text-xs" style={{ color: '#165E4B' }}>{entry.remark}</td>
-                                    <td className="p-3 text-xs" style={{ color: '#4A3728' }}>{entry.head}</td>
+                                    <td className="p-3 text-xs font-bold" style={{ color: '#0D483B', background: '#E5D3AA' }}>{entry.head || 'N/A'}</td>
                                     <td className="p-3">
                                         <div className="flex gap-1">
                                             <Button size="sm" variant="ghost" onClick={() => handleEdit(entry)}><Edit className="h-4 w-4" /></Button>
