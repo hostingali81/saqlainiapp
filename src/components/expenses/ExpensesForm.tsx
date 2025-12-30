@@ -74,12 +74,9 @@ export function ExpensesForm() {
                 }
             };
 
-            // Fetch ALL records for export
-            console.log(`Fetching all ${total} records for export...`);
-            // We use 'total' as limit to get everything in one page
-            // If total is 0, we can fallback to 1000 or handle it safely
-            const fetchLimit = total > 0 ? total : 1000;
-            const allDataResponse = await getExpenses(1, fetchLimit, category);
+            // Fetch ALL records for export (respecting current category filter)
+            console.log(`Fetching all records for export...`);
+            const allDataResponse = await getExpenses(1, 10000, category);
             const allExpenses = allDataResponse.data;
 
             const docDefinition: any = {

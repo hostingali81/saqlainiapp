@@ -37,7 +37,7 @@ export async function getExpenses(page: number = 1, limit: number = 50, category
         }),
         Amount: item.amount,
         Remarks: item.remarks,
-        Head: 'SaqlainiApp' // Default or fetch if exists
+        Head: item.head || 'N/A'
     })) || [];
 
     return { data: formattedData as Expense[], total: count || 0 };
