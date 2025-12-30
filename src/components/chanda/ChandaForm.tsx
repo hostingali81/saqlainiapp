@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import { getChandaEntries, ChandaGroup, ChandaStats } from '@/app/actions/finance';
 import { Input } from '@/components/ui/input';
-import { Search, IndianRupee, Users, ChartLine, Star, Info } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Search, IndianRupee, Users, ChartLine, Star, Info, FileDown } from 'lucide-react';
 import { formatIndianCurrency } from '@/lib/utils';
 import {
     Tooltip,
@@ -11,6 +12,8 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip";
+import pdfMake from 'pdfmake/build/pdfmake';
+import pdfFonts from 'pdfmake/build/vfs_fonts';
 
 export function ChandaForm() {
     const [groups, setGroups] = useState<ChandaGroup[]>([]);
@@ -33,10 +36,249 @@ export function ChandaForm() {
         setLoading(false);
     };
 
+    const exportToPDF = async () => {
+        try {
+            console.log('Starting PDF export with Hindi font support...');
+
+            // Load fonts
+            const fontURL = '/fonts/NotoSansDevanagari-Regular.ttf';
+            const fontBoldURL = '/fonts/NotoSansDevanagari-Bold.ttf';
+
+            const [resRegular, resBold] = await Promise.all([
+                fetch(fontURL),
+                fetch(fontBoldURL)
+            ]);
+
+            if (!resRegular.ok || !resBold.ok) {
+                console.error('Font fetch failed:', resRegular.status, resBold.status);
+                throw new Error(`Failed to fetch fonts: ${resRegular.status} ${resBold.status}`);
+            }
+
+            const [fontRegular, fontBold] = await Promise.all([
+                resRegular.arrayBuffer(),
+                resBold.arrayBuffer()
+            ]);
+
+            // Base64 conversion
+            const fontBase64 = (buffer: ArrayBuffer) => {
+                let binary = '';
+                const bytes = new Uint8Array(buffer);
+                const len = bytes.byteLength;
+                for (let i = 0; i < len; i++) {
+                    binary += String.fromCharCode(bytes[i]);
+                }
+                return window.btoa(binary);
+            };
+
+            // Prepare new VFS entries
+            const vfs = {
+                "Hindi-Regular.ttf": fontBase64(fontRegular),
+                "Hindi-Bold.ttf": fontBase64(fontBold)
+            };
+
+            // Define custom fonts configuration
+            const customFonts = {
+                NotoSans: {
+                    normal: 'Hindi-Regular.ttf',
+                    bold: 'Hindi-Bold.ttf',
+                    italics: 'Hindi-Regular.ttf',
+                    bolditalics: 'Hindi-Bold.ttf'
+                }
+            };
+
+            console.log('VFS keys available:', Object.keys(vfs));
+
+            const docDefinition: any = {
+                pageSize: 'A4',
+                pageMargins: [40, 60, 40, 60],
+                defaultStyle: {
+                    font: 'NotoSans',
+                    fontSize: 10,
+                    color: '#4A3728'
+                },
+                content: [
+                    {
+                        text: 'Chanda Records',
+                        style: 'header',
+                        alignment: 'center',
+                        margin: [0, 0, 0, 5]
+                    },
+                    {
+                        text: `Generated: ${new Date().toLocaleDateString('en-GB')}`,
+                        fontSize: 10,
+                        color: '#666666',
+                        alignment: 'center',
+                        margin: [0, 0, 0, 20]
+                    },
+                    ...(stats ? [{
+                        columns: [
+                            { text: `Total: ₹${formatIndianCurrency(stats.totalAmount)}`, style: 'stats' },
+                            { text: `Donations: ${stats.totalDonations}`, style: 'stats' },
+                            { text: `Average: ₹${formatIndianCurrency(Math.round(stats.avgAmount))}`, style: 'stats' },
+                            { text: `Highest: ₹${formatIndianCurrency(stats.maxAmount)}`, style: 'stats' }
+                        ],
+                        margin: [0, 0, 0, 20]
+                    }] : []),
+                    {
+                        table: {
+                            headerRows: 1,
+                            widths: [30, '*', 80, 70, 120],
+                            body: [
+                                [
+                                    { text: 'Sr.', style: 'tableHeader' },
+                                    { text: 'Name', style: 'tableHeader' },
+                                    { text: 'Amount', style: 'tableHeader', alignment: 'right' },
+                                    { text: 'Last Date', style: 'tableHeader', alignment: 'center' },
+                                    { text: 'Remarks', style: 'tableHeader' }
+                                ],
+                                ...groups.map((group, index) => [
+                                    { text: (index + 1).toString(), alignment: 'center' },
+                                    { text: group.name },
+                                    {
+                                        stack: [
+                                            { text: `₹${formatIndianCurrency(group.totalAmount)}`, bold: true, color: '#059669', fontSize: 11 },
+                                            ...group.donations.map(d => ({
+                                                text: `  ₹${formatIndianCurrency(d.Amount)} (${d.Date})`,
+                                                fontSize: 7,
+                                                color: '#666666',
+                                                margin: [0, 0.5, 0, 0] as [number, number, number, number]
+                                            }))
+                                        ],
+                                        alignment: 'right',
+                                        unbreakable: true
+                                    },
+                                    { text: group.latestDate, alignment: 'center' },
+                                    { text: group.latestRemarks || '-' }
+                                ])
+                            ],
+                            dontBreakRows: true
+                        },
+                        layout: {
+                            fillColor: (rowIndex: number) => rowIndex === 0 ? '#E5D3AA' : (rowIndex % 2 === 0 ? '#FFF8E7' : null),
+                            hLineColor: () => '#C6A869',
+                            vLineColor: () => '#C6A869'
+                        }
+                    }
+                ],
+                styles: {
+                    header: {
+                        fontSize: 22,
+                        bold: true,
+                        color: '#0D483B'
+                    },
+                    stats: {
+                        fontSize: 11,
+                        bold: true,
+                        color: '#4A3728'
+                    },
+                    tableHeader: {
+                        bold: true,
+                        fontSize: 11,
+                        color: '#4A3728'
+                    }
+                },
+                footer: (currentPage: number, pageCount: number) => ({
+                    text: `Page ${currentPage} of ${pageCount}`,
+                    alignment: 'center',
+                    fontSize: 9,
+                    color: '#999999',
+                    margin: [0, 10, 0, 0]
+                })
+            };
+
+            // CRITICAL: Pass VFS and fonts directly to createPdf
+            // Signature: createPdf(docDefinition, tableLayouts, fonts, vfs)
+            (pdfMake as any).createPdf(docDefinition, null, customFonts, vfs).download(`Chanda_Records_${new Date().toISOString().split('T')[0]}.pdf`);
+
+        } catch (error) {
+            console.error('Error generating PDF with Hindi fonts:', error);
+
+            // Fallback to default fonts
+            try {
+                // Reset to default VFS (best effort)
+                (pdfMake as any).vfs = (pdfFonts as any).pdfMake?.vfs || (pdfMake as any).vfs || pdfFonts;
+
+                // Fallback document using default fonts
+                const fallbackDocDef: any = {
+                    pageSize: 'A4',
+                    pageMargins: [40, 60, 40, 60],
+                    defaultStyle: {
+                        fontSize: 10,
+                        color: '#4A3728'
+                        // font: 'Roboto' (default)
+                    },
+                    content: [
+                        { text: 'Chanda Records', style: 'header', alignment: 'center', margin: [0, 0, 0, 5] },
+                        {
+                            text: 'Warning: Failed to load Hindi fonts. Some characters may not display correctly.',
+                            color: 'red',
+                            fontSize: 10,
+                            alignment: 'center',
+                            margin: [0, 0, 0, 20]
+                        },
+                        // We can reuse the same content structure, rely on default font
+                        {
+                            table: {
+                                headerRows: 1,
+                                widths: [30, '*', 80, 70, 120],
+                                body: [
+                                    [
+                                        { text: 'Sr.', style: 'tableHeader' },
+                                        { text: 'Name', style: 'tableHeader' },
+                                        { text: 'Amount', style: 'tableHeader', alignment: 'right' },
+                                        { text: 'Last Date', style: 'tableHeader', alignment: 'center' },
+                                        { text: 'Remarks', style: 'tableHeader' }
+                                    ],
+                                    ...groups.map((group, index) => [
+                                        { text: (index + 1).toString(), alignment: 'center' },
+                                        { text: group.name }, // This might show squares if Hindi
+                                        { text: `₹${formatIndianCurrency(group.totalAmount)}`, alignment: 'right', bold: true, color: '#059669' },
+                                        { text: group.latestDate, alignment: 'center' },
+                                        { text: group.latestRemarks || '-' }
+                                    ])
+                                ]
+                            },
+                            layout: {
+                                fillColor: (rowIndex: number) => rowIndex === 0 ? '#E5D3AA' : (rowIndex % 2 === 0 ? '#FFF8E7' : null),
+                                hLineColor: () => '#C6A869',
+                                vLineColor: () => '#C6A869'
+                            }
+                        }
+                    ],
+                    styles: {
+                        header: { fontSize: 22, bold: true, color: '#0D483B' },
+                        tableHeader: { bold: true, fontSize: 11, color: '#4A3728' }
+                    }
+                };
+
+                alert('Could not load Hindi fonts. Downloading version with default fonts (Hindi text may be broken).');
+                (pdfMake as any).createPdf(fallbackDocDef).download(`Chanda_Records_Fallback_${new Date().toISOString().split('T')[0]}.pdf`);
+
+            } catch (fallbackError) {
+                console.error('Even fallback failed', fallbackError);
+                alert('Failed to generate PDF. Please check console.');
+            }
+        }
+    };
+
     return (
         <main className="max-w-[800px] mx-auto p-6 pb-24">
-            {/* Title */}
-            <h1 className="text-2xl font-bold mb-6" style={{ color: '#0D483B' }}>Chanda Records</h1>
+            {/* Title & Export Button */}
+            <div className="flex justify-between items-center mb-6">
+                <h1 className="text-2xl font-bold" style={{ color: '#0D483B' }}>Chanda Records</h1>
+                <Button
+                    onClick={exportToPDF}
+                    disabled={loading || groups.length === 0}
+                    className="rounded-[15px]"
+                    style={{
+                        background: 'linear-gradient(135deg, #0D483B, #165E4B)',
+                        color: '#FFF8E7'
+                    }}
+                >
+                    <FileDown className="h-4 w-4 mr-2" />
+                    Export PDF
+                </Button>
+            </div>
 
             {/* STATS SUMMARY - PHP Style */}
             <div
