@@ -170,10 +170,10 @@ export async function performSync(target?: string) {
                 console.log(`[DEBUG] ${table}: No deletions detected.`);
             }
 
-            // 6. TRIGGER: Recalculate Bakaya (Only for affected users)
-            if (table === 'payment' && usersToRecalculate.size > 0) {
-                console.log(`Recalculating Bakaya for ${usersToRecalculate.size} users...`);
-                await recalculateBakayaBatch(supabase, usersToRecalculate);
+            // 6. TRIGGER: Recalculate Bakaya for ALL users (not just affected ones)
+            if (table === 'payment') {
+                console.log(`Recalculating Bakaya for ALL users...`);
+                await recalculateBakayaForAllUsers(supabase);
             }
 
             results[table] = {
@@ -193,25 +193,24 @@ export async function performSync(target?: string) {
     return results;
 }
 
-// --- HELPER: Bakaya Recalculation ---
-async function recalculateBakayaBatch(supabase: any, userIds: Set<string>) {
-    // Process in smaller chunks to avoid any potential limits
-    const allUserIds = Array.from(userIds);
+// --- HELPER: Bakaya Recalculation for ALL Users ---
+async function recalculateBakayaForAllUsers(supabase: any) {
+    // Fetch all users
+    const { data: allUsers, error } = await supabase.from('user_list').select('id, frequency');
+    if (error || !allUsers) {
+        console.error('Failed to fetch users for bakaya recalculation:', error);
+        return;
+    }
+
+    console.log(`Processing ${allUsers.length} users for bakaya recalculation...`);
+
     const CHUNK_SIZE = 50;
+    for (let i = 0; i < allUsers.length; i += CHUNK_SIZE) {
+        const chunk = allUsers.slice(i, i + CHUNK_SIZE);
 
-    for (let i = 0; i < allUserIds.length; i += CHUNK_SIZE) {
-        const chunk = allUserIds.slice(i, i + CHUNK_SIZE);
-
-        // Parallelize within chunk for speed
-        await Promise.all(chunk.map(async (userId) => {
-            if (!userId) return;
-
-            // Fetch User Info
-            const { data: user } = await supabase.from('user_list').select('frequency').eq('id', userId).single();
-            if (!user) return; // Skip if user deleted
-
+        await Promise.all(chunk.map(async (user: any) => {
             // Fetch Payment History
-            const { data: payments } = await supabase.from('payment').select('year, month').eq('user_id', userId);
+            const { data: payments } = await supabase.from('payment').select('year, month').eq('user_id', user.id);
 
             const totalPaidMonths = new Set(payments?.map((p: any) => `${p.year}-${p.month}`)).size || 0;
 
@@ -226,7 +225,9 @@ async function recalculateBakayaBatch(supabase: any, userIds: Set<string>) {
             const newBakaya = calculateBakayaStatus(minYear, minMonth, totalPaidMonths, user.frequency);
 
             // Update
-            await supabase.from('user_list').update({ bakaya_month: newBakaya }).eq('id', userId);
+            await supabase.from('user_list').update({ bakaya_month: newBakaya }).eq('id', user.id);
         }));
     }
+
+    console.log(`Bakaya recalculation completed for all users.`);
 }
