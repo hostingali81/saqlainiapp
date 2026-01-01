@@ -38,7 +38,12 @@ export async function getUserProfile(userId: number) {
     return { user, financials, payments };
 }
 
-export async function processSmartPayment(userId: number, amount: number, remarks: Record<string, string> = {}) {
+export async function processSmartPayment(
+    userId: number, 
+    amount: number, 
+    remarks: Record<string, string> = {},
+    customAllocations?: Array<{year: number, month: number, amount: number}>
+) {
     const supabase = await createClient();
 
     // 1. Get current status
@@ -52,7 +57,14 @@ export async function processSmartPayment(userId: number, amount: number, remark
     if (!user || !financials) return { error: 'Invalid user data' };
 
     // 2. Calculate Allocation
-    const allocations = allocatePayment(amount, financials.history);
+    let allocations;
+    if (customAllocations && customAllocations.length > 0) {
+        // Use custom allocations if provided
+        allocations = customAllocations;
+    } else {
+        // Otherwise calculate automatically
+        allocations = allocatePayment(amount, financials.history);
+    }
 
     if (allocations.length === 0) {
         return { error: 'Unable to allocate payment.' };

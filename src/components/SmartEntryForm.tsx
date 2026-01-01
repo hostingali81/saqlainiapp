@@ -20,6 +20,7 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
     const [selectedUserId, setSelectedUserId] = useState<string>('');
     const [amount, setAmount] = useState<string>('');
     const [remarks, setRemarks] = useState<Record<string, string>>({});
+    const [customAmounts, setCustomAmounts] = useState<Record<string, number>>({});
     const [globalRemark, setGlobalRemark] = useState<string>('');
     const [showRemarkDialog, setShowRemarkDialog] = useState(false);
     const [showNewEntryForm, setShowNewEntryForm] = useState(false);
@@ -97,9 +98,13 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
         
         const hasCurrentMonth = dueMonths.some(d => d.year === currentYear && d.month === currentMonth);
         
-        if (totalAmount === 100 && hasCurrentMonth) {
+        // Agar sirf 1 month due hai aur amount >= 100, poora amount us month mein
+        if (dueMonths.length === 1 && totalAmount >= 100) {
+            allocated.push({month: dueMonths[0], amount: totalAmount});
+        } else if (totalAmount >= 100 && totalAmount <= 124 && hasCurrentMonth) {
+            // ₹100-124 ke beech = current month mein poora amount
             const current = dueMonths.find(d => d.year === currentYear && d.month === currentMonth);
-            if (current) allocated.push({month: current, amount: 100});
+            if (current) allocated.push({month: current, amount: totalAmount});
         } else {
             let remaining = totalAmount;
             let clearableMonths = 0;
@@ -129,6 +134,12 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
     const handleOpenRemarkDialog = () => {
         const allocated = calculateAllocations();
         setAllocatedMonths(allocated);
+        // Initialize custom amounts with calculated amounts
+        const initialAmounts: Record<string, number> = {};
+        allocated.forEach(({month, amount}) => {
+            initialAmounts[`${month.year}-${month.month}`] = amount;
+        });
+        setCustomAmounts(initialAmounts);
         setShowRemarkDialog(true);
     };
 
@@ -139,11 +150,22 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
         setResult(null);
 
         try {
-            const res = await processSmartPayment(parseInt(selectedUserId), parseInt(amount), remarks);
+            // Use custom amounts if edited, otherwise use calculated
+            const finalAllocations = allocatedMonths.map(({month}) => {
+                const key = `${month.year}-${month.month}`;
+                return {
+                    year: month.year,
+                    month: month.month,
+                    amount: customAmounts[key] || 0
+                };
+            });
+
+            const res = await processSmartPayment(parseInt(selectedUserId), parseInt(amount), remarks, finalAllocations);
             setResult(res);
             if (res.success) {
                 setAmount('');
                 setRemarks({});
+                setCustomAmounts({});
                 setGlobalRemark('');
                 setShowRemarkDialog(false);
                 onPaymentSuccess?.();
@@ -472,17 +494,30 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
                             {allocatedMonths.map(({month, amount}) => {
                                 const monthKey = `${month.year}-${month.month}`;
                                 return (
-                                    <div key={monthKey} className="space-y-1">
+                                    <div key={monthKey} className="space-y-1 p-3 bg-gray-50 rounded-md">
                                         <label className="text-xs font-medium text-green-700">
-                                            {month.monthName} {month.year} - ₹{amount}
+                                            {month.monthName} {month.year}
                                         </label>
-                                        <Input
-                                            type="text"
-                                            placeholder="Remark (optional)"
-                                            value={remarks[monthKey] || ''}
-                                            onChange={(e) => setRemarks({...remarks, [monthKey]: e.target.value})}
-                                            className="text-sm"
-                                        />
+                                        <div className="flex gap-2">
+                                            <div className="flex-1">
+                                                <Input
+                                                    type="number"
+                                                    placeholder="Amount"
+                                                    value={customAmounts[monthKey] || amount}
+                                                    onChange={(e) => setCustomAmounts({...customAmounts, [monthKey]: parseInt(e.target.value) || 0})}
+                                                    className="text-sm"
+                                                />
+                                            </div>
+                                            <div className="flex-1">
+                                                <Input
+                                                    type="text"
+                                                    placeholder="Remark (optional)"
+                                                    value={remarks[monthKey] || ''}
+                                                    onChange={(e) => setRemarks({...remarks, [monthKey]: e.target.value})}
+                                                    className="text-sm"
+                                                />
+                                            </div>
+                                        </div>
                                     </div>
                                 );
                             })}
@@ -490,7 +525,10 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setShowRemarkDialog(false)}>
-                            Close
+                            Cancel
+                        </Button>
+                        <Button onClick={() => setShowRemarkDialog(false)}>
+                            Done
                         </Button>
                     </DialogFooter>
                 </DialogContent>
