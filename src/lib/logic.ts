@@ -194,6 +194,19 @@ export function allocatePayment(
                 amount: allocAmount
             });
         }
+    } else {
+        // Amount is not enough to clear any month - allocate to current month if due, else oldest
+        const targetMonth = hasCurrentMonth 
+            ? dueMonths.find(d => d.year === currentYear && d.month === currentMonth)
+            : dueMonths[0];
+        
+        if (targetMonth) {
+            allocations.push({
+                year: targetMonth.year,
+                month: targetMonth.month,
+                amount: amount
+            });
+        }
     }
 
     return allocations;
