@@ -96,14 +96,50 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
             return allocated;
         }
         
-        // ONLY allocate to due months - distribute equally
-        const numDueMonths = dueMonths.length;
-        const perMonth = Math.floor(totalAmount / numDueMonths);
-        const remainder = totalAmount % numDueMonths;
+        // Check if current month is in due list
+        const hasCurrentMonth = dueMonths.some(d => d.year === currentYear && d.month === currentMonth);
         
-        for (let i = 0; i < numDueMonths; i++) {
-            const allocAmount = perMonth + (i < remainder ? 1 : 0);
-            allocated.push({month: dueMonths[i], amount: allocAmount});
+        // Special case: exactly 100 and current month is due
+        if (totalAmount === 100 && hasCurrentMonth) {
+            const current = dueMonths.find(d => d.year === currentYear && d.month === currentMonth);
+            if (current) {
+                allocated.push({month: current, amount: 100});
+            }
+            return allocated;
+        }
+        
+        // Calculate how many months can be cleared with minimum amounts
+        let remaining = totalAmount;
+        let clearableMonths = 0;
+        for (let i = 0; i < dueMonths.length; i++) {
+            const isCurrent = dueMonths[i].year === currentYear && dueMonths[i].month === currentMonth;
+            const min = isCurrent ? 100 : 125;
+            if (remaining >= min) {
+                remaining -= min;
+                clearableMonths++;
+            } else {
+                break;
+            }
+        }
+        
+        // Distribute amount equally among clearable months
+        if (clearableMonths > 0) {
+            const perMonth = Math.floor(totalAmount / clearableMonths);
+            const remainder = totalAmount % clearableMonths;
+            
+            for (let i = 0; i < clearableMonths; i++) {
+                const allocAmount = perMonth + (i < remainder ? 1 : 0);
+                allocated.push({month: dueMonths[i], amount: allocAmount});
+            }
+        } else {
+            // Amount is not enough to clear any month - allocate to current month if due, else oldest
+            const targetMonth = hasCurrentMonth 
+                ? dueMonths.find(d => d.year === currentYear && d.month === currentMonth)
+                : dueMonths[0];
+            
+            if (targetMonth) {
+                allocated.push({month: targetMonth, amount: totalAmount});
+            }
         }
         
         return allocated;
