@@ -96,84 +96,14 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
             return allocated;
         }
         
-        const currentMonthIndex = dueMonths.findIndex(d => d.year === currentYear && d.month === currentMonth);
-        const hasCurrentMonth = currentMonthIndex !== -1;
+        // ONLY allocate to due months - distribute equally
+        const numDueMonths = dueMonths.length;
+        const perMonth = Math.floor(totalAmount / numDueMonths);
+        const remainder = totalAmount % numDueMonths;
         
-        // Single month due - allocate full amount
-        if (dueMonths.length === 1 && totalAmount >= 100) {
-            allocated.push({month: dueMonths[0], amount: totalAmount});
-            return allocated;
-        }
-        
-        // Amount between 100-124 - allocate to current month only
-        if (totalAmount >= 100 && totalAmount <= 124) {
-            if (hasCurrentMonth) {
-                allocated.push({month: dueMonths[currentMonthIndex], amount: totalAmount});
-            } else {
-                // Current month not in due list, create new entry
-                const monthName = new Date(currentYear, currentMonth - 1).toLocaleString('default', { month: 'long' });
-                allocated.push({
-                    month: {
-                        year: currentYear,
-                        month: currentMonth,
-                        monthName: monthName,
-                        amount: totalAmount,
-                        status: 'paid'
-                    },
-                    amount: totalAmount
-                });
-            }
-            return allocated;
-        }
-        
-        // Separate old months and current month
-        const oldMonths = dueMonths.filter(d => !(d.year === currentYear && d.month === currentMonth));
-        
-        // Calculate how many old months can be cleared with 125 each, keeping min 100 for current
-        let clearableOldMonths = 0;
-        let remaining = totalAmount;
-        
-        for (let i = 0; i < oldMonths.length; i++) {
-            if (remaining >= 225) {
-                // Can allocate 125 to this old month and still have 100+ for current
-                clearableOldMonths++;
-                remaining -= 125;
-            } else {
-                break;
-            }
-        }
-        
-        // Allocate 125 to each clearable old month
-        for (let i = 0; i < clearableOldMonths; i++) {
-            allocated.push({month: oldMonths[i], amount: 125});
-        }
-        
-        // Calculate remaining after old months
-        remaining = totalAmount - (clearableOldMonths * 125);
-        
-        // If remaining < 100 and we cleared at least one old month, add remaining to last old month
-        if (remaining > 0 && remaining < 100 && clearableOldMonths > 0) {
-            allocated[allocated.length - 1].amount += remaining;
-            remaining = 0;
-        }
-        
-        // If remaining >= 100, allocate to current month
-        if (remaining >= 100) {
-            if (hasCurrentMonth) {
-                allocated.push({month: dueMonths[currentMonthIndex], amount: remaining});
-            } else {
-                const monthName = new Date(currentYear, currentMonth - 1).toLocaleString('default', { month: 'long' });
-                allocated.push({
-                    month: {
-                        year: currentYear,
-                        month: currentMonth,
-                        monthName: monthName,
-                        amount: remaining,
-                        status: 'paid'
-                    },
-                    amount: remaining
-                });
-            }
+        for (let i = 0; i < numDueMonths; i++) {
+            const allocAmount = perMonth + (i < remainder ? 1 : 0);
+            allocated.push({month: dueMonths[i], amount: allocAmount});
         }
         
         return allocated;

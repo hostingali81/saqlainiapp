@@ -99,8 +99,6 @@ export async function processSmartPayment(
 
     // 4. Update User's Bakaya Month (Decrement by actual due months cleared)
     // Only count months that were actually in the due list
-    const currentYear = new Date().getFullYear();
-    const currentMonth = new Date().getMonth() + 1;
     const dueMonthsCleared = allocations.filter(a => {
         // Check if this month was in the original due list
         const isDue = financials.history.some(h => 
