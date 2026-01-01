@@ -5,8 +5,12 @@ import { User, Payment, MonthStatus, UserFinancialSummary } from '@/types';
  * Calculates the payment history and due status for a user.
  */
 export function calculateUserFinancials(user: User, payments: Payment[]): UserFinancialSummary {
-    const currentYear = new Date().getFullYear();
-    const currentMonth = new Date().getMonth() + 1; // 1-12
+    // Force IST timezone
+    const now = new Date();
+    const istOffset = 5.5 * 60 * 60 * 1000; // IST is UTC+5:30
+    const istTime = new Date(now.getTime() + istOffset);
+    const currentYear = istTime.getUTCFullYear();
+    const currentMonth = istTime.getUTCMonth() + 1;
 
     // Determine start date dynamically from payments (Logic from profile.php)
     let startYear = currentYear;
@@ -126,8 +130,12 @@ export function allocatePayment(
 ): { year: number; month: number; amount: number }[] {
 
     const allocations: { year: number; month: number; amount: number }[] = [];
-    const currentYear = new Date().getFullYear();
-    const currentMonth = new Date().getMonth() + 1;
+    // Force IST timezone
+    const now = new Date();
+    const istOffset = 5.5 * 60 * 60 * 1000;
+    const istTime = new Date(now.getTime() + istOffset);
+    const currentYear = istTime.getUTCFullYear();
+    const currentMonth = istTime.getUTCMonth() + 1;
 
     // Filter for due months and sort by Oldest First (FIFO)
     const dueMonths = [...history]
@@ -203,9 +211,12 @@ export function calculateBakayaStatus(
 ): number {
     if (frequency !== 'Regular') return 0;
 
-    const currentDate = new Date();
-    const currentYear = currentDate.getFullYear();
-    const currentMonth = currentDate.getMonth() + 1;
+    // Force IST timezone
+    const now = new Date();
+    const istOffset = 5.5 * 60 * 60 * 1000;
+    const istTime = new Date(now.getTime() + istOffset);
+    const currentYear = istTime.getUTCFullYear();
+    const currentMonth = istTime.getUTCMonth() + 1;
 
     // Default start date (from PHP logic)
     // If first_payment is not set, we might assume they just started or handle it gracefully.
