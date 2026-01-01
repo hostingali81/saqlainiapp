@@ -97,9 +97,21 @@ export async function processSmartPayment(
         return { error: `Failed to record payments: ${insertError.message}` };
     }
 
-    // 4. Update User's Bakaya Month (Decrement)
-    const monthsPaid = Math.floor(amount / 125);
-    const newBakaya = Math.max(0, user.bakaya_month - monthsPaid);
+    // 4. Update User's Bakaya Month (Decrement by actual due months cleared)
+    // Only count months that were actually in the due list
+    const currentYear = new Date().getFullYear();
+    const currentMonth = new Date().getMonth() + 1;
+    const dueMonthsCleared = allocations.filter(a => {
+        // Check if this month was in the original due list
+        const isDue = financials.history.some(h => 
+            h.year === a.year && 
+            h.month === a.month && 
+            h.status === 'due'
+        );
+        return isDue;
+    }).length;
+    
+    const newBakaya = Math.max(0, user.bakaya_month - dueMonthsCleared);
 
     await supabase
         .from('user_list')

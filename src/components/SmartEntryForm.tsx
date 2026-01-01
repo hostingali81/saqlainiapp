@@ -105,9 +105,24 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
             return allocated;
         }
         
-        // Amount between 100-124 and current month is due - allocate to current month only
-        if (totalAmount >= 100 && totalAmount <= 124 && hasCurrentMonth) {
-            allocated.push({month: dueMonths[currentMonthIndex], amount: totalAmount});
+        // Amount between 100-124 - allocate to current month only
+        if (totalAmount >= 100 && totalAmount <= 124) {
+            if (hasCurrentMonth) {
+                allocated.push({month: dueMonths[currentMonthIndex], amount: totalAmount});
+            } else {
+                // Current month not in due list, create new entry
+                const monthName = new Date(currentYear, currentMonth - 1).toLocaleString('default', { month: 'long' });
+                allocated.push({
+                    month: {
+                        year: currentYear,
+                        month: currentMonth,
+                        monthName: monthName,
+                        amount: totalAmount,
+                        status: 'paid'
+                    },
+                    amount: totalAmount
+                });
+            }
             return allocated;
         }
         
@@ -183,13 +198,18 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
         setResult(null);
 
         try {
+            // Calculate allocations if not already done
+            const allocations = allocatedMonths.length > 0 ? allocatedMonths : calculateAllocations();
+            
             // Use custom amounts if edited, otherwise use calculated
-            const finalAllocations = allocatedMonths.map(({month}) => {
+            const finalAllocations = allocations.map(({month}) => {
                 const key = `${month.year}-${month.month}`;
+                const customAmount = customAmounts[key];
+                const calculatedAmount = allocations.find(a => a.month.year === month.year && a.month.month === month.month)?.amount || 0;
                 return {
                     year: month.year,
                     month: month.month,
-                    amount: customAmounts[key] || 0
+                    amount: customAmount !== undefined ? customAmount : calculatedAmount
                 };
             });
 
@@ -201,6 +221,7 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
                 setCustomAmounts({});
                 setGlobalRemark('');
                 setShowRemarkDialog(false);
+                setAllocatedMonths([]);
                 onPaymentSuccess?.();
             }
         } catch (e) {
