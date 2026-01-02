@@ -114,7 +114,7 @@ export function UserCard({ user, style }: UserCardProps) {
                                     }}
                                     onClick={(e) => {
                                         e.preventDefault();
-                                        window.location.href = `tel:${user.phone}`;
+                                        window.location.href = `tel:+91${user.phone?.replace(/\D/g, '') || ''}`;
                                     }}
                                 >
                                     <Phone className="h-5 w-5" />

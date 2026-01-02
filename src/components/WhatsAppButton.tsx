@@ -8,38 +8,41 @@ interface WhatsAppButtonProps {
 }
 
 export function WhatsAppButton({ user, financials }: WhatsAppButtonProps) {
-    const handleWhatsApp = () => {
-        if (!user.phone) return;
-
-        const dueAmount = financials.dueMonthsCount * (user.amount || 125);
-        const avgPayment = financials.paidMonthsCount > 0 ? (financials.totalPaid / financials.paidMonthsCount).toFixed(2) : '0.00';
-
-        // Exact Hindi Message from Legacy profile.php
-        let message = `जनाब *_${user.name.trim()}_* साहब,\\n\\n`;
-        message += `*💰 आपकी अदायगी की तफ्सीलात (Payment Details):* \\n`;
-        message += `अब तक कुल जमा रकम: *₹${financials.totalPaid.toLocaleString('en-IN')}*\\n`;
-        message += `हर महीने की जमा एवरेज रकम: *₹${avgPayment}*\\n\\n`;
-
-        if (financials.dueMonthsCount > 0 && user.frequency !== 'One Time') {
-            message += `*⚠️ बकाया तफ्सीलात (Due Details):*\\n`;
-            message += `कुल बकाया महीने: *${financials.dueMonthsCount}*\\n`;
-            message += `कम से कम बकाया रकम: *₹${dueAmount.toLocaleString('en-IN')}*\\n\\n`;
-            message += `_मेहरबानी करके जल्द से जल्द अपना बकाया रकम जमा करें।_ 🙏`;
-        } else {
-            message += `*✅🎉 आपके सभी महीनो का पेमेंट अप टू डेट हैं, शुक्रिया!*`;
-        }
-
-        message += `\\n\\n*सादर,* 🕌\\n*सकलैनी मस्जिद केसरपुर* `;
-
-        const url = `https://wa.me/${user.phone.replace(/\D/g, '')}?text=${encodeURIComponent(message)}`;
-        window.open(url, '_blank');
-    };
-
     if (!user.phone) return null;
+
+    const dueAmount = financials.dueMonthsCount * (user.amount || 125);
+    const avgPayment = financials.paidMonthsCount > 0 ? (financials.totalPaid / financials.paidMonthsCount).toFixed(2) : '0.00';
+
+    // Exact Hindi Message from Legacy profile.php
+    let message = `जनाब *_${user.name.trim()}_* साहब,\n\n`;
+    message += `*${String.fromCodePoint(0x1F4B0)} आपकी अदायगी की तफ्सीलात (Payment Details):* \n`;
+    message += `अब तक कुल जमा रकम: *₹${financials.totalPaid.toLocaleString('en-IN')}*\n`;
+    message += `हर महीने की जमा एवरेज रकम: *₹${avgPayment}*\n\n`;
+
+    if (financials.dueMonthsCount > 0 && user.frequency !== 'One Time') {
+        message += `*${String.fromCodePoint(0x26A0, 0xFE0F)} बकाया तफ्सीलात (Due Details):*\n`;
+        message += `कुल बकाया महीने: *${financials.dueMonthsCount}*\n`;
+        message += `कम से कम बकाया रकम: *₹${dueAmount.toLocaleString('en-IN')}*\n\n`;
+        message += `_मेहरबानी करके जल्द से जल्द अपना बकाया रकम जमा करें।_ ${String.fromCodePoint(0x1F64F)}`;
+    } else {
+        message += `*${String.fromCodePoint(0x2705, 0x1F389)} आपके सभी महीनो का पेमेंट अप टू डेट हैं, शुक्रिया!*`;
+    }
+
+    message += `\n\n*सादर,* ${String.fromCodePoint(0x1F54C)}\n*सकलैनी मस्जिद केसरपुर*`;
+
+    // Phone number logic: strip non-digits, ensure it starts with 91
+    let cleanPhone = user.phone.replace(/\D/g, '');
+    if (!cleanPhone.startsWith('91')) {
+        cleanPhone = '91' + cleanPhone;
+    }
+
+    // Switch to api.whatsapp.com to prevent redirect encoding issues
+    const url = `https://api.whatsapp.com/send?phone=${cleanPhone}&text=${encodeURIComponent(message)}`;
 
     return (
         <a
-            onClick={handleWhatsApp}
+            href={url}
+            target="_blank"
             className="inline-flex items-center justify-center rounded-[25px] px-6 py-3 font-medium transition-all min-w-[140px] cursor-pointer hover:-translate-y-0.5 hover:shadow-[0_4px_15px_rgba(37,211,102,0.3)]"
             style={{
                 background: 'linear-gradient(135deg, #25D366, #128C7E)',

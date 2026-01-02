@@ -94,7 +94,7 @@ async function ProfileContent({ id }: { id: string }) {
                 <div className="flex gap-4 justify-center mt-4 flex-col sm:flex-row">
                     {user.phone ? (
                         <a
-                            href={`tel:${user.phone}`}
+                            href={`tel:+91${user.phone.replace(/\D/g, '')}`}
                             className="inline-flex items-center justify-center rounded-[25px] px-6 py-3 font-medium transition-all min-w-[140px] hover:-translate-y-0.5 hover:shadow-[0_4px_15px_rgba(198,168,105,0.3)]"
                             style={{
                                 background: 'linear-gradient(135deg, #0D483B, #165E4B)',
@@ -215,7 +215,7 @@ async function ProfileContent({ id }: { id: string }) {
 
 export default async function ProfilePage({ params }: PageProps) {
     const { id } = await params;
-    
+
     return (
         <Suspense fallback={<ProfileSkeleton />}>
             <ProfileContent id={id} />
