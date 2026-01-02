@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function POST(request: NextRequest) {
     try {
@@ -22,8 +23,11 @@ export async function POST(request: NextRequest) {
         const largeBuffer = await largeImage.arrayBuffer();
         const smallBuffer = await smallImage.arrayBuffer();
 
+        // Use admin client for storage operations
+        const adminClient = createAdminClient();
+
         // Upload Large Image
-        const { error: largeError } = await supabase
+        const { error: largeError } = await adminClient
             .storage
             .from('user-photos')
             .upload(`large_image/${userId}.jpg`, largeBuffer, {
@@ -34,7 +38,7 @@ export async function POST(request: NextRequest) {
         if (largeError) throw largeError;
 
         // Upload Small Image
-        const { error: smallError } = await supabase
+        const { error: smallError } = await adminClient
             .storage
             .from('user-photos')
             .upload(`small_image/${userId}.jpg`, smallBuffer, {

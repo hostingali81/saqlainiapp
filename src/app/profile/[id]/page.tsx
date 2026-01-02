@@ -9,6 +9,7 @@ import { notFound } from 'next/navigation';
 import { formatIndianCurrency, getPhotoUrl } from '@/lib/utils';
 import { Suspense } from 'react';
 import { ProfileSkeleton } from '@/components/skeletons/ProfileSkeleton';
+import { ProfileImage } from '@/components/ProfileImage';
 
 interface PageProps {
     params: Promise<{ id: string }>;
@@ -37,21 +38,7 @@ async function ProfileContent({ id }: { id: string }) {
 
             {/* PROFILE HEADER - Exact PHP match + subtle glass */}
             <div className="glass-card rounded-[15px] p-6 mb-6 text-center relative">
-                <img
-                    src={getPhotoUrl(user.id, 'large')}
-                    alt={user.name}
-                    className="mx-auto mb-4 rounded-full object-cover"
-                    style={{
-                        border: '3px solid #C6A869',
-                        padding: '3px',
-                        background: '#FFF8E7',
-                        width: '150px',
-                        height: '150px'
-                    }}
-                    onError={(e) => {
-                        e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&bold=true&color=0D483B&size=300`;
-                    }}
-                />
+                <ProfileImage userId={user.id} userName={user.name} />
 
                 {/* Profile Name - PHP style */}
                 <h2

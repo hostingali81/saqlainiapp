@@ -16,6 +16,8 @@ interface PhotoManagementProps {
 export function PhotoManagement({ users }: PhotoManagementProps) {
     const [selectedUserId, setSelectedUserId] = useState<string>('');
     const [photoModalOpen, setPhotoModalOpen] = useState(false);
+    const [imageKey, setImageKey] = useState(0);
+    const [successMessage, setSuccessMessage] = useState('');
 
     const selectedUser = users.find(u => u.id.toString() === selectedUserId);
 
@@ -23,11 +25,11 @@ export function PhotoManagement({ users }: PhotoManagementProps) {
     const userOptions = users.map(u => ({
         value: u.id.toString(),
         label: `${u.name} - ${u.fname}`,
-        image: getPhotoUrl(u.id, 'small')
+        image: `${getPhotoUrl(u.id, 'small')}?v=${Date.now()}`
     }));
 
     const currentImageUrl = selectedUser
-        ? getPhotoUrl(selectedUser.id, 'large')
+        ? `${getPhotoUrl(selectedUser.id, 'large')}?v=${Date.now()}`
         : '';
 
     const handleDelete = async () => {
@@ -45,8 +47,9 @@ export function PhotoManagement({ users }: PhotoManagementProps) {
             const data = await response.json();
 
             if (data.success) {
-                alert('Photo deleted successfully!');
-                window.location.reload();
+                setImageKey(prev => prev + 1);
+                setSuccessMessage('Photo deleted successfully!');
+                setTimeout(() => setSuccessMessage(''), 3000);
             } else {
                 alert('Failed to delete photo');
             }
@@ -63,6 +66,12 @@ export function PhotoManagement({ users }: PhotoManagementProps) {
                     <CardTitle>Photo Management</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
+                    {successMessage && (
+                        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative">
+                            {successMessage}
+                        </div>
+                    )}
+
                     {/* Searchable User Select */}
                     <div className="space-y-2">
                         <label className="text-sm font-medium">Select User</label>
@@ -81,6 +90,7 @@ export function PhotoManagement({ users }: PhotoManagementProps) {
                                 <p className="text-sm font-medium mb-2">Current Photo</p>
                                 <div className="flex justify-center">
                                     <img
+                                        key={imageKey}
                                         src={currentImageUrl}
                                         alt={selectedUser.name}
                                         className="w-40 h-40 rounded-full object-cover border-4 border-gray-200"
@@ -130,7 +140,10 @@ export function PhotoManagement({ users }: PhotoManagementProps) {
                 isOpen={photoModalOpen}
                 onClose={() => setPhotoModalOpen(false)}
                 onSuccess={() => {
-                    window.location.reload();
+                    setPhotoModalOpen(false);
+                    setImageKey(prev => prev + 1);
+                    setSuccessMessage('Operation completed successfully!');
+                    setTimeout(() => setSuccessMessage(''), 3000);
                 }}
             />
         </>

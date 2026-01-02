@@ -26,7 +26,7 @@ export function UserCard({ user, style }: UserCardProps) {
     };
 
     const largeImageUrl = user.hasImage
-        ? getPhotoUrl(user.id, 'large')
+        ? `${getPhotoUrl(user.id, 'large')}?v=${Date.now()}`
         : `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&bold=true&color=0D483B&size=300`;
 
     return (
@@ -45,7 +45,7 @@ export function UserCard({ user, style }: UserCardProps) {
 
                         <div className="relative cursor-pointer flex-shrink-0" onClick={handleImageClick}>
                             <img
-                                src={getPhotoUrl(user.id, 'small')}
+                                src={`${getPhotoUrl(user.id, 'small')}?v=${Date.now()}`}
                                 alt={user.name}
                                 className="h-[50px] w-[50px] rounded-full object-cover glass-avatar"
                                 loading={isPriority ? 'eager' : 'lazy'}

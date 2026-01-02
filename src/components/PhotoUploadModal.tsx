@@ -87,10 +87,8 @@ export function PhotoUploadModal({ user, isOpen, onClose, onSuccess }: PhotoUplo
             const data = await response.json();
 
             if (data.success) {
-                // Determine origin to perform a hard reload
-                window.location.href = window.location.href;
-                // Alternatively, if we just want to reload:
-                window.location.reload();
+                onSuccess();
+                handleClose();
             } else {
                 alert('Failed to upload photo');
                 setUploading(false);
@@ -119,8 +117,8 @@ export function PhotoUploadModal({ user, isOpen, onClose, onSuccess }: PhotoUplo
             const data = await response.json();
 
             if (data.success) {
-                alert('Photo deleted successfully!');
-                window.location.reload();
+                onSuccess();
+                handleClose();
             } else {
                 alert('Failed to delete photo');
             }
@@ -141,10 +139,7 @@ export function PhotoUploadModal({ user, isOpen, onClose, onSuccess }: PhotoUplo
 
     if (!user) return null;
 
-    const hasImage = user.hasImage;
-    const currentImageUrl = hasImage
-        ? `${getPhotoUrl(user.id, 'large')}?v=${Date.now()}`
-        : `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&bold=true&color=0D483B&size=300`;
+    const currentImageUrl = `${getPhotoUrl(user.id, 'large')}?v=${Date.now()}`;
 
     return (
         <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -196,17 +191,15 @@ export function PhotoUploadModal({ user, isOpen, onClose, onSuccess }: PhotoUplo
                                 </label>
                             </div>
 
-                            {hasImage && (
-                                <Button
-                                    onClick={deletePhoto}
-                                    disabled={uploading}
-                                    variant="destructive"
-                                    className="w-full"
-                                >
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    Delete Current Photo
-                                </Button>
-                            )}
+                            <Button
+                                onClick={deletePhoto}
+                                disabled={uploading}
+                                variant="destructive"
+                                className="w-full"
+                            >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Delete Current Photo
+                            </Button>
                         </>
                     ) : (
                         <>
