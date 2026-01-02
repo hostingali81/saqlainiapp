@@ -167,11 +167,11 @@ export function PaymentEntriesTable({ refreshTrigger }: { refreshTrigger?: numbe
 
             {/* Edit Dialog */}
             <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-                <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+                <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[80vh] flex flex-col">
                     <DialogHeader>
                         <DialogTitle>Edit Payment Entry</DialogTitle>
                     </DialogHeader>
-                    <div className="space-y-3">
+                    <div className="space-y-3 overflow-y-auto flex-1 pr-2">
                         <div>
                             <label className="text-sm font-medium">Name</label>
                             <Input
@@ -218,7 +218,7 @@ export function PaymentEntriesTable({ refreshTrigger }: { refreshTrigger?: numbe
                                 onChange={(e) => setEditData({ ...editData, remarks: e.target.value })}
                             />
                         </div>
-                        <div>
+                        <div className="pb-2">
                             <label className="text-sm font-medium">Phone Number</label>
                             <Input
                                 value={editData.phone || ''}
@@ -226,12 +226,12 @@ export function PaymentEntriesTable({ refreshTrigger }: { refreshTrigger?: numbe
                             />
                         </div>
                     </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setShowEditDialog(false)}>
+                    <DialogFooter className="flex-row gap-2 pt-4">
+                        <Button variant="outline" onClick={() => setShowEditDialog(false)} className="flex-1">
                             Cancel
                         </Button>
-                        <Button onClick={handleSaveEdit}>
-                            Save Changes
+                        <Button onClick={handleSaveEdit} className="flex-1">
+                            Save
                         </Button>
                     </DialogFooter>
                 </DialogContent>
