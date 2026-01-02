@@ -8,6 +8,10 @@ const nextConfig = {
         protocol: 'https',
         hostname: 'ui-avatars.com',
       },
+      {
+        protocol: 'https',
+        hostname: '*.supabase.co',
+      },
     ],
     formats: ['image/webp'],
   },
@@ -22,7 +26,6 @@ const nextConfig = {
   },
 };
 
-// export default withSerwist(nextConfig);
 export default nextConfig;
 
 

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Camera, Trash2 } from 'lucide-react';
 import { PhotoUploadModal } from '@/components/PhotoUploadModal';
+import { getPhotoUrl } from '@/lib/utils';
 
 interface PhotoManagementProps {
     users: User[];
@@ -22,13 +23,13 @@ export function PhotoManagement({ users }: PhotoManagementProps) {
     const userOptions = users.map(u => ({
         value: u.id.toString(),
         label: `${u.name} - ${u.fname}`,
-        image: u.hasImage ? `/upload/small_image/${u.id}.jpg` : `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name)}&size=32&background=0D483B&color=FFF8E7&bold=true`
+        image: u.hasImage ? getPhotoUrl(u.id, 'small') : `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name)}&size=32&background=0D483B&color=FFF8E7&bold=true`
     }));
 
     const hasImage = selectedUser?.hasImage;
     const currentImageUrl = selectedUser
         ? (hasImage
-            ? `/upload/large_image/${selectedUser.id}.jpg?v=${Date.now()}`
+            ? `${getPhotoUrl(selectedUser.id, 'large')}?v=${Date.now()}`
             : `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedUser.name)}&bold=true&color=666&size=300`)
         : '';
 

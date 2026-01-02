@@ -8,7 +8,11 @@ export async function POST(req: NextRequest) {
 
         console.log(`[REQUEST] Received sync request with target: ${target}`);
 
-        const SECRET_TOKEN = process.env.SYNC_SECRET_TOKEN || "my-secure-sync-token-123";
+        const SECRET_TOKEN = process.env.SYNC_SECRET_TOKEN;
+        if (!SECRET_TOKEN) {
+            console.error('[ERROR] SYNC_SECRET_TOKEN not configured');
+            return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+        }
         if (token !== SECRET_TOKEN) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
         const results = await performSync(target);

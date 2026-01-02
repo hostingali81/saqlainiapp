@@ -23,13 +23,31 @@ export default async function PhotosPage() {
         return <div>Error loading users.</div>;
     }
 
+    // List all files in the small_image folder
+    const { data: fileList, error: storageError } = await supabase
+        .storage
+        .from('user-photos')
+        .list('small_image', {
+            limit: 1000,
+            offset: 0,
+            sortBy: { column: 'name', order: 'asc' },
+        });
+
+    // Create a Set of user IDs that have images
+    const existingImages = new Set<string>();
+    if (fileList) {
+        fileList.forEach(file => {
+            if (file.name.endsWith('.jpg')) {
+                const userId = file.name.replace('.jpg', '');
+                existingImages.add(userId);
+            }
+        });
+    }
+
     const usersWithImages = (users as User[]).map(user => {
-        const fs = require('fs');
-        const path = require('path');
-        const imagePath = path.join(process.cwd(), 'public', 'upload', 'small_image', `${user.id}.jpg`);
         return {
             ...user,
-            hasImage: fs.existsSync(imagePath)
+            hasImage: existingImages.has(user.id.toString())
         };
     });
 

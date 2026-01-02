@@ -1,8 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { UserList } from '@/components/UserList';
 import { User } from '@/types';
-import { existsSync } from 'fs';
-import path from 'path';
 import { Suspense } from 'react';
 import { CardSkeleton } from '@/components/skeletons/CardSkeleton';
 
@@ -37,11 +35,31 @@ async function HomeContent() {
     return 0;
   });
 
+  // List all files in the small_image folder
+  const { data: fileList, error: storageError } = await supabase
+    .storage
+    .from('user-photos')
+    .list('small_image', {
+      limit: 1000,
+      offset: 0,
+      sortBy: { column: 'name', order: 'asc' },
+    });
+
+  // Create a Set of user IDs that have images
+  const existingImages = new Set<string>();
+  if (fileList && !storageError) {
+    fileList.forEach(file => {
+      if (file.name.endsWith('.jpg')) {
+        const userId = file.name.replace('.jpg', '');
+        existingImages.add(userId);
+      }
+    });
+  }
+
   const usersWithImages = sortedUsers.map(user => {
-    const imagePath = path.join(process.cwd(), 'public', 'upload', 'small_image', `${user.id}.jpg`);
     return {
       ...user,
-      hasImage: existsSync(imagePath)
+      hasImage: existingImages.has(user.id.toString())
     };
   });
 

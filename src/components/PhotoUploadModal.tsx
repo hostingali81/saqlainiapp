@@ -8,6 +8,7 @@ import { Camera, Upload, Trash2, ZoomIn, ZoomOut } from 'lucide-react';
 import Image from 'next/image';
 import Cropper from 'react-easy-crop';
 import { getCroppedImg } from '@/lib/cropImage';
+import { getPhotoUrl } from '@/lib/utils';
 
 interface PhotoUploadModalProps {
     user: User | null;
@@ -143,7 +144,7 @@ export function PhotoUploadModal({ user, isOpen, onClose, onSuccess }: PhotoUplo
 
     const hasImage = user.hasImage;
     const currentImageUrl = hasImage
-        ? `/upload/large_image/${user.id}.jpg?v=${Date.now()}`
+        ? `${getPhotoUrl(user.id, 'large')}?v=${Date.now()}`
         : `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&bold=true&color=666&size=300`;
 
     return (

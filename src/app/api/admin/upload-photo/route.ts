@@ -1,7 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
-import { existsSync } from 'fs';
-import path from 'path';
 import { createClient } from '@/lib/supabase/server';
 
 export async function POST(request: NextRequest) {
@@ -22,24 +19,30 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
 
-        const largeDir = path.join(process.cwd(), 'public', 'upload', 'large_image');
-        const smallDir = path.join(process.cwd(), 'public', 'upload', 'small_image');
+        const largeBuffer = await largeImage.arrayBuffer();
+        const smallBuffer = await smallImage.arrayBuffer();
 
-        if (!existsSync(largeDir)) {
-            await mkdir(largeDir, { recursive: true });
-        }
-        if (!existsSync(smallDir)) {
-            await mkdir(smallDir, { recursive: true });
-        }
+        // Upload Large Image
+        const { error: largeError } = await supabase
+            .storage
+            .from('user-photos')
+            .upload(`large_image/${userId}.jpg`, largeBuffer, {
+                contentType: 'image/jpeg',
+                upsert: true
+            });
 
-        const largeBuffer = Buffer.from(await largeImage.arrayBuffer());
-        const smallBuffer = Buffer.from(await smallImage.arrayBuffer());
+        if (largeError) throw largeError;
 
-        const largeImagePath = path.join(largeDir, `${userId}.jpg`);
-        const smallImagePath = path.join(smallDir, `${userId}.jpg`);
+        // Upload Small Image
+        const { error: smallError } = await supabase
+            .storage
+            .from('user-photos')
+            .upload(`small_image/${userId}.jpg`, smallBuffer, {
+                contentType: 'image/jpeg',
+                upsert: true
+            });
 
-        await writeFile(largeImagePath, largeBuffer);
-        await writeFile(smallImagePath, smallBuffer);
+        if (smallError) throw smallError;
 
         return NextResponse.json({
             success: true,

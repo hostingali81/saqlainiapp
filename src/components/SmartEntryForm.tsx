@@ -10,6 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { processSmartPayment, getUserProfile, createNewUserPayment } from '@/app/actions/user';
 import { Check, UserPlus } from 'lucide-react';
+import { getPhotoUrl } from '@/lib/utils';
 
 interface SmartEntryFormProps {
     users: User[];
@@ -28,8 +29,8 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
     const [result, setResult] = useState<{ success?: boolean; allocated?: any[]; error?: string } | null>(null);
     const [dueMonths, setDueMonths] = useState<MonthStatus[]>([]);
     const [loadingMonths, setLoadingMonths] = useState(false);
-    const [allocatedMonths, setAllocatedMonths] = useState<Array<{month: MonthStatus, amount: number}>>([]);
-    
+    const [allocatedMonths, setAllocatedMonths] = useState<Array<{ month: MonthStatus, amount: number }>>([]);
+
     // New Entry Form States
     const [newEntryData, setNewEntryData] = useState({
         name: '',
@@ -69,17 +70,17 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
         .map(u => ({
             value: u.id.toString(),
             label: `${u.name} - ${u.fname} (${u.bakaya_month} Due)`,
-            image: u.hasImage ? `/upload/small_image/${u.id}.jpg` : `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name)}&size=32&background=0D483B&color=FFF8E7&bold=true`
+            image: u.hasImage ? getPhotoUrl(u.id, 'small') : `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name)}&size=32&background=0D483B&color=FFF8E7&bold=true`
         }));
 
     const calculateAllocations = () => {
-        const allocated: Array<{month: MonthStatus, amount: number}> = [];
+        const allocated: Array<{ month: MonthStatus, amount: number }> = [];
         if (!amount || parseInt(amount) <= 0) return allocated;
 
         const currentYear = new Date().getFullYear();
         const currentMonth = new Date().getMonth() + 1;
         let totalAmount = parseInt(amount);
-        
+
         // If no due months OR user is One Time, allocate to current month
         if (dueMonths.length === 0 || selectedUser?.frequency === 'One Time') {
             const monthName = new Date(currentYear, currentMonth - 1).toLocaleString('default', { month: 'long' });
@@ -95,19 +96,19 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
             });
             return allocated;
         }
-        
+
         // Check if current month is in due list
         const hasCurrentMonth = dueMonths.some(d => d.year === currentYear && d.month === currentMonth);
-        
+
         // Special case: exactly 100 and current month is due
         if (totalAmount === 100 && hasCurrentMonth) {
             const current = dueMonths.find(d => d.year === currentYear && d.month === currentMonth);
             if (current) {
-                allocated.push({month: current, amount: 100});
+                allocated.push({ month: current, amount: 100 });
             }
             return allocated;
         }
-        
+
         // Calculate how many months can be cleared with minimum amounts
         let remaining = totalAmount;
         let clearableMonths = 0;
@@ -121,27 +122,27 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
                 break;
             }
         }
-        
+
         // Distribute amount equally among clearable months
         if (clearableMonths > 0) {
             const perMonth = Math.floor(totalAmount / clearableMonths);
             const remainder = totalAmount % clearableMonths;
-            
+
             for (let i = 0; i < clearableMonths; i++) {
                 const allocAmount = perMonth + (i < remainder ? 1 : 0);
-                allocated.push({month: dueMonths[i], amount: allocAmount});
+                allocated.push({ month: dueMonths[i], amount: allocAmount });
             }
         } else {
             // Amount is not enough to clear any month - allocate to current month if due, else oldest
-            const targetMonth = hasCurrentMonth 
+            const targetMonth = hasCurrentMonth
                 ? dueMonths.find(d => d.year === currentYear && d.month === currentMonth)
                 : dueMonths[0];
-            
+
             if (targetMonth) {
-                allocated.push({month: targetMonth, amount: totalAmount});
+                allocated.push({ month: targetMonth, amount: totalAmount });
             }
         }
-        
+
         return allocated;
     };
 
@@ -150,7 +151,7 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
         setAllocatedMonths(allocated);
         // Initialize custom amounts with calculated amounts
         const initialAmounts: Record<string, number> = {};
-        allocated.forEach(({month, amount}) => {
+        allocated.forEach(({ month, amount }) => {
             initialAmounts[`${month.year}-${month.month}`] = amount;
         });
         setCustomAmounts(initialAmounts);
@@ -166,9 +167,9 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
         try {
             // Calculate allocations if not already done
             const allocations = allocatedMonths.length > 0 ? allocatedMonths : calculateAllocations();
-            
+
             // Use custom amounts if edited, otherwise use calculated
-            const finalAllocations = allocations.map(({month}) => {
+            const finalAllocations = allocations.map(({ month }) => {
                 const key = `${month.year}-${month.month}`;
                 const customAmount = customAmounts[key];
                 const calculatedAmount = allocations.find(a => a.month.year === month.year && a.month.month === month.month)?.amount || 0;
@@ -199,7 +200,7 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
 
     const applyGlobalRemark = () => {
         const newRemarks: Record<string, string> = {};
-        allocatedMonths.forEach(({month}) => {
+        allocatedMonths.forEach(({ month }) => {
             const key = `${month.year}-${month.month}`;
             newRemarks[key] = globalRemark;
         });
@@ -262,14 +263,14 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
                     {showNewEntryForm && (
                         <div className="space-y-3 p-4 bg-gray-50 rounded-md border border-gray-200">
                             <h4 className="text-sm font-semibold text-gray-700">New User Payment Entry</h4>
-                            
+
                             <div className="space-y-2">
                                 <label className="text-xs font-medium">Name *</label>
                                 <Input
                                     type="text"
                                     placeholder="Enter name"
                                     value={newEntryData.name}
-                                    onChange={(e) => setNewEntryData({...newEntryData, name: e.target.value})}
+                                    onChange={(e) => setNewEntryData({ ...newEntryData, name: e.target.value })}
                                 />
                             </div>
 
@@ -279,7 +280,7 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
                                     type="text"
                                     placeholder="Enter father name"
                                     value={newEntryData.fname}
-                                    onChange={(e) => setNewEntryData({...newEntryData, fname: e.target.value})}
+                                    onChange={(e) => setNewEntryData({ ...newEntryData, fname: e.target.value })}
                                 />
                             </div>
 
@@ -289,7 +290,7 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
                                     type="tel"
                                     placeholder="Enter mobile number"
                                     value={newEntryData.phone}
-                                    onChange={(e) => setNewEntryData({...newEntryData, phone: e.target.value})}
+                                    onChange={(e) => setNewEntryData({ ...newEntryData, phone: e.target.value })}
                                 />
                             </div>
 
@@ -299,7 +300,7 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
                                     type="number"
                                     placeholder="Enter amount"
                                     value={newEntryData.amount}
-                                    onChange={(e) => setNewEntryData({...newEntryData, amount: e.target.value})}
+                                    onChange={(e) => setNewEntryData({ ...newEntryData, amount: e.target.value })}
                                 />
                             </div>
 
@@ -307,7 +308,7 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
                                 <label className="text-xs font-medium">Payment Frequency *</label>
                                 <Select
                                     value={newEntryData.frequency}
-                                    onValueChange={(value: 'Regular' | 'One Time') => setNewEntryData({...newEntryData, frequency: value})}
+                                    onValueChange={(value: 'Regular' | 'One Time') => setNewEntryData({ ...newEntryData, frequency: value })}
                                 >
                                     <SelectTrigger>
                                         <SelectValue />
@@ -325,7 +326,7 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
                                     type="text"
                                     placeholder="Optional remarks"
                                     value={newEntryData.remarks}
-                                    onChange={(e) => setNewEntryData({...newEntryData, remarks: e.target.value})}
+                                    onChange={(e) => setNewEntryData({ ...newEntryData, remarks: e.target.value })}
                                 />
                             </div>
 
@@ -398,15 +399,14 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
                                         const allocated = calculateAllocations();
                                         const allocatedItem = allocated.find(a => a.month.year === m.year && a.month.month === m.month);
                                         const allocatedAmount = allocatedItem?.amount || 0;
-                                        
+
                                         return (
-                                            <span 
-                                                key={`${m.year}-${m.month}`} 
-                                                className={`text-xs px-2 py-1 rounded-full ${
-                                                    allocatedAmount > 0 
-                                                        ? 'bg-green-100 text-green-700' 
-                                                        : 'bg-red-100 text-red-700'
-                                                }`}
+                                            <span
+                                                key={`${m.year}-${m.month}`}
+                                                className={`text-xs px-2 py-1 rounded-full ${allocatedAmount > 0
+                                                    ? 'bg-green-100 text-green-700'
+                                                    : 'bg-red-100 text-red-700'
+                                                    }`}
                                             >
                                                 {m.monthName} {m.year}{allocatedAmount > 0 && ` - ₹${allocatedAmount}`}
                                             </span>
@@ -421,7 +421,7 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
                                     {(() => {
                                         const allocated = calculateAllocations();
                                         return allocated.map((a, idx) => (
-                                            <span 
+                                            <span
                                                 key={idx}
                                                 className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700"
                                             >
@@ -441,7 +441,7 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
                                 {(() => {
                                     const allocated = calculateAllocations();
                                     return allocated.map((a, idx) => (
-                                        <span 
+                                        <span
                                             key={idx}
                                             className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700"
                                         >
@@ -511,7 +511,7 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
                             </Button>
                         </div>
                         <div className="space-y-2 max-h-[50vh] overflow-y-auto">
-                            {allocatedMonths.map(({month, amount}) => {
+                            {allocatedMonths.map(({ month, amount }) => {
                                 const monthKey = `${month.year}-${month.month}`;
                                 return (
                                     <div key={monthKey} className="space-y-1 p-3 bg-gray-50 rounded-md">
@@ -524,7 +524,7 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
                                                     type="number"
                                                     placeholder="Amount"
                                                     value={customAmounts[monthKey] || amount}
-                                                    onChange={(e) => setCustomAmounts({...customAmounts, [monthKey]: parseInt(e.target.value) || 0})}
+                                                    onChange={(e) => setCustomAmounts({ ...customAmounts, [monthKey]: parseInt(e.target.value) || 0 })}
                                                     className="text-sm"
                                                 />
                                             </div>
@@ -533,7 +533,7 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
                                                     type="text"
                                                     placeholder="Remark (optional)"
                                                     value={remarks[monthKey] || ''}
-                                                    onChange={(e) => setRemarks({...remarks, [monthKey]: e.target.value})}
+                                                    onChange={(e) => setRemarks({ ...remarks, [monthKey]: e.target.value })}
                                                     className="text-sm"
                                                 />
                                             </div>

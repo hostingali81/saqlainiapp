@@ -7,7 +7,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import Image from 'next/image';
-import { cn } from '@/lib/utils';
+import { cn, getPhotoUrl } from '@/lib/utils';
 import { ImageModal } from './ImageModal';
 
 interface UserCardProps {
@@ -27,7 +27,7 @@ export function UserCard({ user, style }: UserCardProps) {
     };
 
     const largeImageUrl = user.hasImage
-        ? `/upload/large_image/${user.id}.jpg`
+        ? getPhotoUrl(user.id, 'large')
         : `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&bold=true&color=0D483B&size=300`;
 
     return (
@@ -48,7 +48,7 @@ export function UserCard({ user, style }: UserCardProps) {
                         <div className="relative cursor-pointer flex-shrink-0" onClick={handleImageClick}>
                             {user.hasImage ? (
                                 <Image
-                                    src={`/upload/small_image/${user.id}.jpg`}
+                                    src={getPhotoUrl(user.id, 'small')}
                                     alt={user.name}
                                     width={50}
                                     height={50}
