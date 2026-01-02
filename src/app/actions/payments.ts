@@ -5,8 +5,8 @@ import { revalidatePath } from 'next/cache';
 
 export async function getPaymentEntries(page: number = 1, perPage: number = 10) {
     try {
-        const data = await getSheetData('FormResponses!A:H');
-        
+        const data = await getSheetData('FormResponses!A:I');
+
         if (!data || data.length <= 1) {
             return { entries: [], total: 0, page, perPage };
         }
@@ -21,7 +21,8 @@ export async function getPaymentEntries(page: number = 1, perPage: number = 10) 
             month: row[4] || '',
             monthName: row[5] || '',
             year: row[6] || '',
-            remarks: row[7] || ''
+            phone: row[7] || '',  // Index 7 is Phone
+            remarks: row[8] || '' // Index 8 is Remarks
         }));
 
         const total = entries.length;
@@ -37,7 +38,7 @@ export async function getPaymentEntries(page: number = 1, perPage: number = 10) 
 
 export async function updatePaymentEntry(rowIndex: number, data: any) {
     try {
-        const range = `FormResponses!A${rowIndex + 1}:H${rowIndex + 1}`;
+        const range = `FormResponses!A${rowIndex + 1}:I${rowIndex + 1}`;
         const values = [[
             data.timestamp,
             data.name,
@@ -46,9 +47,10 @@ export async function updatePaymentEntry(rowIndex: number, data: any) {
             data.month,
             data.monthName,
             data.year,
-            data.remarks
+            data.phone,   // Index 7
+            data.remarks  // Index 8
         ]];
-        
+
         await updateSheetRow(range, values);
         revalidatePath('/admin');
         return { success: true };

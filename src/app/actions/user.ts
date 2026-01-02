@@ -39,10 +39,10 @@ export async function getUserProfile(userId: number) {
 }
 
 export async function processSmartPayment(
-    userId: number, 
-    amount: number, 
+    userId: number,
+    amount: number,
     remarks: Record<string, string> = {},
-    customAllocations?: Array<{year: number, month: number, amount: number}>
+    customAllocations?: Array<{ year: number, month: number, amount: number }>
 ) {
     const supabase = await createClient();
 
@@ -76,9 +76,9 @@ export async function processSmartPayment(
         .select('id')
         .order('id', { ascending: false })
         .limit(1);
-    
+
     let nextId = (maxIdData && maxIdData[0]?.id) ? maxIdData[0].id + 1 : 1;
-    
+
     const paymentsToInsert = allocations.map(a => ({
         id: nextId++,
         user_id: userId,
@@ -101,14 +101,14 @@ export async function processSmartPayment(
     // Only count months that were actually in the due list
     const dueMonthsCleared = allocations.filter(a => {
         // Check if this month was in the original due list
-        const isDue = financials.history.some(h => 
-            h.year === a.year && 
-            h.month === a.month && 
+        const isDue = financials.history.some(h =>
+            h.year === a.year &&
+            h.month === a.month &&
             h.status === 'due'
         );
         return isDue;
     }).length;
-    
+
     const newBakaya = Math.max(0, user.bakaya_month - dueMonthsCleared);
 
     await supabase
@@ -121,7 +121,7 @@ export async function processSmartPayment(
         const now = new Date();
         const timestamp = now.toLocaleString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).replace(',', '');
         const paymentDate = now.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
-        
+
         const rows = allocations.map(allocation => {
             const monthName = new Date(allocation.year, allocation.month - 1).toLocaleString('en-US', { month: 'short', year: '2-digit' });
             const monthKey = `${allocation.year}-${allocation.month}`;
@@ -133,10 +133,11 @@ export async function processSmartPayment(
                 allocation.month,
                 monthName,
                 allocation.year,
-                remarks[monthKey] || ''
+                '', // Index 7 (Phone) - Empty for existing users via smart payment
+                remarks[monthKey] || '' // Index 8 (Remarks)
             ];
         });
-        
+
         await appendToSheet('FormResponses!A:H', rows);
     } catch (sheetError) {
         console.error('Failed to add to Google Sheet:', sheetError);
@@ -169,7 +170,7 @@ export async function createNewUserPayment(data: {
         const timestamp = now.toLocaleString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).replace(',', '');
         const paymentDate = now.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
         const monthFormatted = new Date(currentYear, currentMonth - 1).toLocaleString('en-US', { month: 'short', year: '2-digit' });
-        
+
         const row = [
             timestamp,
             `${data.name} / ${data.fname}`,
@@ -178,12 +179,12 @@ export async function createNewUserPayment(data: {
             currentMonth,
             monthFormatted,
             currentYear,
-            data.phone,
-            data.remarks || '',
+            data.phone, // Index 7: Phone first
+            data.remarks || '', // Index 8: Remarks second
             '', // Payment Screenshot Upload - blank
             data.frequency // EntryPayment Frequency
         ];
-        
+
         await appendToSheet('FormResponses!A:K', [row]);
     } catch (sheetError) {
         console.error('Failed to add to Google Sheet:', sheetError);

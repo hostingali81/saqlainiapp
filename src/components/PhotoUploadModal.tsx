@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { User } from '@/types';
-import { Camera, Upload, Trash2 } from 'lucide-react';
+import { Camera, Upload, Trash2, ZoomIn, ZoomOut } from 'lucide-react';
 import Image from 'next/image';
+import Cropper from 'react-easy-crop';
+import { getCroppedImg } from '@/lib/cropImage';
 
 interface PhotoUploadModalProps {
     user: User | null;
@@ -17,72 +19,59 @@ interface PhotoUploadModalProps {
 export function PhotoUploadModal({ user, isOpen, onClose, onSuccess }: PhotoUploadModalProps) {
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string>('');
-    const [cropping, setCropping] = useState(false);
+    const [crop, setCrop] = useState({ x: 0, y: 0 });
+    const [zoom, setZoom] = useState(1);
+    const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
     const [uploading, setUploading] = useState(false);
-    const canvasRef = useRef<HTMLCanvasElement>(null);
-    const imageRef = useRef<HTMLImageElement>(null);
 
+    // Cleanup object URLs to avoid memory leaks
     useEffect(() => {
-        if (!selectedFile) {
-            setPreviewUrl('');
-            return;
-        }
+        return () => {
+            if (previewUrl && previewUrl.startsWith('blob:')) {
+                URL.revokeObjectURL(previewUrl);
+            }
+        };
+    }, [previewUrl]);
 
-        const objectUrl = URL.createObjectURL(selectedFile);
-        setPreviewUrl(objectUrl);
-
-        return () => URL.revokeObjectURL(objectUrl);
-    }, [selectedFile]);
+    const onCropComplete = useCallback((croppedArea: any, croppedAreaPixels: any) => {
+        setCroppedAreaPixels(croppedAreaPixels);
+    }, []);
 
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file && file.type.startsWith('image/')) {
+        if (e.target.files && e.target.files.length > 0) {
+            const file = e.target.files[0];
             setSelectedFile(file);
-            setCropping(true);
+            setPreviewUrl(URL.createObjectURL(file));
+            setZoom(1);
+            setCrop({ x: 0, y: 0 });
         }
     };
 
     const cropAndUpload = async () => {
-        if (!selectedFile || !imageRef.current || !canvasRef.current || !user) return;
+        if (!selectedFile || !croppedAreaPixels || !user) return;
 
         setUploading(true);
 
         try {
-            const img = imageRef.current;
+            // Generate Large Image (300x300)
+            const largeBlob = await getCroppedImg(
+                previewUrl,
+                croppedAreaPixels,
+                300,
+                300
+            );
 
-            // Create 300x300 canvas for large image
-            const largeCanvas = document.createElement('canvas');
-            largeCanvas.width = 300;
-            largeCanvas.height = 300;
-            const largeCtx = largeCanvas.getContext('2d');
+            // Generate Small Image (70x70)
+            const smallBlob = await getCroppedImg(
+                previewUrl,
+                croppedAreaPixels,
+                70,
+                70
+            );
 
-            // Create 70x70 canvas for small image
-            const smallCanvas = document.createElement('canvas');
-            smallCanvas.width = 70;
-            smallCanvas.height = 70;
-            const smallCtx = smallCanvas.getContext('2d');
-
-            if (!largeCtx || !smallCtx) {
-                throw new Error('Could not get canvas context');
+            if (!largeBlob || !smallBlob) {
+                throw new Error('Failed to crop image');
             }
-
-            // Calculate crop dimensions (square from center)
-            const size = Math.min(img.naturalWidth, img.naturalHeight);
-            const x = (img.naturalWidth - size) / 2;
-            const y = (img.naturalHeight - size) / 2;
-
-            // Draw cropped and resized images
-            largeCtx.drawImage(img, x, y, size, size, 0, 0, 300, 300);
-            smallCtx.drawImage(img, x, y, size, size, 0, 0, 70, 70);
-
-            // Convert to blobs
-            const largeBlob = await new Promise<Blob>((resolve) => {
-                largeCanvas.toBlob((blob) => resolve(blob!), 'image/jpeg', 0.9);
-            });
-
-            const smallBlob = await new Promise<Blob>((resolve) => {
-                smallCanvas.toBlob((blob) => resolve(blob!), 'image/jpeg', 0.9);
-            });
 
             // Upload
             const formData = new FormData();
@@ -98,16 +87,17 @@ export function PhotoUploadModal({ user, isOpen, onClose, onSuccess }: PhotoUplo
             const data = await response.json();
 
             if (data.success) {
-                alert('Photo uploaded successfully!');
-                onSuccess();
-                onClose();
+                // Determine origin to perform a hard reload
+                window.location.href = window.location.href;
+                // Alternatively, if we just want to reload:
+                window.location.reload();
             } else {
                 alert('Failed to upload photo');
+                setUploading(false);
             }
         } catch (error) {
             console.error('Upload error:', error);
             alert('Error uploading photo');
-        } finally {
             setUploading(false);
         }
     };
@@ -130,8 +120,7 @@ export function PhotoUploadModal({ user, isOpen, onClose, onSuccess }: PhotoUplo
 
             if (data.success) {
                 alert('Photo deleted successfully!');
-                onSuccess();
-                onClose();
+                window.location.reload();
             } else {
                 alert('Failed to delete photo');
             }
@@ -143,6 +132,13 @@ export function PhotoUploadModal({ user, isOpen, onClose, onSuccess }: PhotoUplo
         }
     };
 
+    const handleClose = () => {
+        setSelectedFile(null);
+        setPreviewUrl('');
+        setUploading(false);
+        onClose();
+    };
+
     if (!user) return null;
 
     const hasImage = user.hasImage;
@@ -151,8 +147,8 @@ export function PhotoUploadModal({ user, isOpen, onClose, onSuccess }: PhotoUplo
         : `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&bold=true&color=666&size=300`;
 
     return (
-        <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-md">
+        <Dialog open={isOpen} onOpenChange={handleClose}>
+            <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <Camera className="h-5 w-5" />
@@ -161,80 +157,112 @@ export function PhotoUploadModal({ user, isOpen, onClose, onSuccess }: PhotoUplo
                 </DialogHeader>
 
                 <div className="space-y-4">
-                    {/* User Info */}
-                    <div className="text-center">
-                        <h3 className="font-semibold">{user.name}</h3>
-                        <p className="text-sm text-muted-foreground">{user.fname}</p>
-                    </div>
+                    {!selectedFile ? (
+                        <>
+                            {/* User Info */}
+                            <div className="text-center">
+                                <h3 className="font-semibold">{user.name}</h3>
+                                <p className="text-sm text-muted-foreground">{user.fname}</p>
+                            </div>
 
-                    {/* Current Photo */}
-                    <div className="flex justify-center">
-                        <Image
-                            src={currentImageUrl}
-                            alt={user.name}
-                            width={128}
-                            height={128}
-                            className="w-32 h-32 rounded-full object-cover border-2 border-gray-200"
-                        />
-                    </div>
+                            {/* Current Photo */}
+                            <div className="flex justify-center">
+                                <Image
+                                    src={currentImageUrl}
+                                    alt={user.name}
+                                    width={150}
+                                    height={150}
+                                    className="w-32 h-32 rounded-full object-cover border-2 border-gray-200"
+                                    unoptimized
+                                />
+                            </div>
 
-                    {/* File Input */}
-                    <div>
-                        <label className="block">
-                            <input
-                                type="file"
-                                accept="image/*"
-                                onChange={handleFileSelect}
-                                className="hidden"
-                                id="photo-upload"
-                            />
-                            <Button asChild variant="outline" className="w-full">
-                                <label htmlFor="photo-upload" className="cursor-pointer">
-                                    <Upload className="h-4 w-4 mr-2" />
-                                    Select Photo
+                            {/* File Input */}
+                            <div>
+                                <label className="block">
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={handleFileSelect}
+                                        className="hidden"
+                                        id="photo-upload"
+                                    />
+                                    <Button asChild variant="outline" className="w-full">
+                                        <label htmlFor="photo-upload" className="cursor-pointer">
+                                            <Upload className="h-4 w-4 mr-2" />
+                                            Select Photo
+                                        </label>
+                                    </Button>
                                 </label>
-                            </Button>
-                        </label>
-                    </div>
+                            </div>
 
-                    {/* Preview */}
-                    {previewUrl && (
-                        <div className="border rounded p-2">
-                            <p className="text-sm font-medium mb-2">Preview:</p>
-                            <img
-                                ref={imageRef}
-                                src={previewUrl}
-                                alt="Preview"
-                                className="w-full rounded"
-                            />
-                            <canvas ref={canvasRef} className="hidden" />
-                        </div>
+                            {hasImage && (
+                                <Button
+                                    onClick={deletePhoto}
+                                    disabled={uploading}
+                                    variant="destructive"
+                                    className="w-full"
+                                >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Delete Current Photo
+                                </Button>
+                            )}
+                        </>
+                    ) : (
+                        <>
+                            {/* Cropper UI */}
+                            <div className="relative w-full h-64 bg-gray-900 rounded-lg overflow-hidden touch-none">
+                                <Cropper
+                                    image={previewUrl}
+                                    crop={crop}
+                                    zoom={zoom}
+                                    aspect={1}
+                                    onCropChange={setCrop}
+                                    onCropComplete={onCropComplete}
+                                    onZoomChange={setZoom}
+                                    cropShape="round"
+                                />
+                            </div>
+
+                            {/* Zoom Slider */}
+                            <div className="flex items-center gap-2">
+                                <ZoomOut className="h-4 w-4 text-muted-foreground" />
+                                <input
+                                    type="range"
+                                    value={zoom}
+                                    min={1}
+                                    max={3}
+                                    step={0.1}
+                                    aria-labelledby="Zoom"
+                                    onChange={(e) => setZoom(Number(e.target.value))}
+                                    className="flex-1"
+                                />
+                                <ZoomIn className="h-4 w-4 text-muted-foreground" />
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex gap-2 pt-2">
+                                <Button
+                                    variant="outline"
+                                    onClick={() => {
+                                        setSelectedFile(null);
+                                        setPreviewUrl('');
+                                    }}
+                                    disabled={uploading}
+                                    className="flex-1"
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    onClick={cropAndUpload}
+                                    disabled={uploading}
+                                    className="flex-1"
+                                >
+                                    {uploading ? 'Uploading...' : 'Save & Upload'}
+                                </Button>
+                            </div>
+                        </>
                     )}
-
-                    {/* Actions */}
-                    <div className="flex gap-2">
-                        {selectedFile && (
-                            <Button
-                                onClick={cropAndUpload}
-                                disabled={uploading}
-                                className="flex-1"
-                            >
-                                {uploading ? 'Uploading...' : 'Crop & Upload'}
-                            </Button>
-                        )}
-
-                        {hasImage && (
-                            <Button
-                                onClick={deletePhoto}
-                                disabled={uploading}
-                                variant="destructive"
-                                className="flex-1"
-                            >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Delete
-                            </Button>
-                        )}
-                    </div>
                 </div>
             </DialogContent>
         </Dialog>

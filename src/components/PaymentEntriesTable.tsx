@@ -17,6 +17,7 @@ interface PaymentEntry {
     monthName: string;
     year: string;
     remarks: string;
+    phone: string;
 }
 
 export function PaymentEntriesTable({ refreshTrigger }: { refreshTrigger?: number }) {
@@ -51,14 +52,15 @@ export function PaymentEntriesTable({ refreshTrigger }: { refreshTrigger?: numbe
             month: entry.month,
             monthName: entry.monthName,
             year: entry.year,
-            remarks: entry.remarks
+            remarks: entry.remarks,
+            phone: entry.phone
         });
         setShowEditDialog(true);
     };
 
     const handleSaveEdit = async () => {
         if (!editEntry) return;
-        
+
         const result = await updatePaymentEntry(editEntry.rowIndex, editData);
         if (result.success) {
             setShowEditDialog(false);
@@ -68,7 +70,7 @@ export function PaymentEntriesTable({ refreshTrigger }: { refreshTrigger?: numbe
 
     const handleDelete = async (entry: PaymentEntry) => {
         if (!confirm(`Delete entry for ${entry.name}?`)) return;
-        
+
         const result = await deletePaymentEntry(entry.rowIndex);
         if (result.success) {
             loadEntries();
@@ -81,7 +83,7 @@ export function PaymentEntriesTable({ refreshTrigger }: { refreshTrigger?: numbe
         <>
             <div className="mt-8">
                 <h2 className="text-xl font-bold mb-4">Recent Payment Entries</h2>
-                
+
                 {loading ? (
                     <div className="text-center p-4">Loading...</div>
                 ) : entries.length === 0 ? (
@@ -92,7 +94,8 @@ export function PaymentEntriesTable({ refreshTrigger }: { refreshTrigger?: numbe
                             <table className="w-full text-sm border-collapse">
                                 <thead>
                                     <tr className="border-b">
-                                        <th className="text-left p-2">Name</th>
+                                        <th className="text-left p-2 whitespace-nowrap">Name</th>
+                                        <th className="text-left p-2">Date</th>
                                         <th className="text-left p-2">Amount</th>
                                         <th className="text-left p-2">Month</th>
                                         <th className="text-left p-2">Remarks</th>
@@ -102,7 +105,8 @@ export function PaymentEntriesTable({ refreshTrigger }: { refreshTrigger?: numbe
                                 <tbody>
                                     {entries.map((entry) => (
                                         <tr key={entry.rowIndex} className="border-b hover:bg-muted/50">
-                                            <td className="p-2">{entry.name}</td>
+                                            <td className="p-2 whitespace-nowrap">{entry.name}</td>
+                                            <td className="p-2">{entry.paymentDate}</td>
                                             <td className="p-2">₹{entry.amount}</td>
                                             <td className="p-2">{entry.monthName}</td>
                                             <td className="p-2 text-xs text-muted-foreground">{entry.remarks || '-'}</td>
@@ -172,7 +176,7 @@ export function PaymentEntriesTable({ refreshTrigger }: { refreshTrigger?: numbe
                             <label className="text-sm font-medium">Name</label>
                             <Input
                                 value={editData.name || ''}
-                                onChange={(e) => setEditData({...editData, name: e.target.value})}
+                                onChange={(e) => setEditData({ ...editData, name: e.target.value })}
                             />
                         </div>
                         <div>
@@ -180,14 +184,45 @@ export function PaymentEntriesTable({ refreshTrigger }: { refreshTrigger?: numbe
                             <Input
                                 type="number"
                                 value={editData.amount || ''}
-                                onChange={(e) => setEditData({...editData, amount: e.target.value})}
+                                onChange={(e) => setEditData({ ...editData, amount: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <label className="text-sm font-medium">Payment Date</label>
+                            <Input
+                                value={editData.paymentDate || ''}
+                                onChange={(e) => setEditData({ ...editData, paymentDate: e.target.value })}
+                                placeholder="MM/DD/YYYY"
+                            />
+                        </div>
+                        <div>
+                            <label className="text-sm font-medium">Month (No.)</label>
+                            <Input
+                                type="number"
+                                value={editData.month || ''}
+                                onChange={(e) => setEditData({ ...editData, month: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <label className="text-sm font-medium">Year</label>
+                            <Input
+                                type="number"
+                                value={editData.year || ''}
+                                onChange={(e) => setEditData({ ...editData, year: e.target.value })}
                             />
                         </div>
                         <div>
                             <label className="text-sm font-medium">Remarks</label>
                             <Input
                                 value={editData.remarks || ''}
-                                onChange={(e) => setEditData({...editData, remarks: e.target.value})}
+                                onChange={(e) => setEditData({ ...editData, remarks: e.target.value })}
+                            />
+                        </div>
+                        <div>
+                            <label className="text-sm font-medium">Phone Number</label>
+                            <Input
+                                value={editData.phone || ''}
+                                onChange={(e) => setEditData({ ...editData, phone: e.target.value })}
                             />
                         </div>
                     </div>
@@ -196,7 +231,7 @@ export function PaymentEntriesTable({ refreshTrigger }: { refreshTrigger?: numbe
                             Cancel
                         </Button>
                         <Button onClick={handleSaveEdit}>
-                            Save
+                            Save Changes
                         </Button>
                     </DialogFooter>
                 </DialogContent>
