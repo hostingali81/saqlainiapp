@@ -6,7 +6,6 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import Image from 'next/image';
 import { cn, getPhotoUrl } from '@/lib/utils';
 import { ImageModal } from './ImageModal';
 
@@ -44,30 +43,16 @@ export function UserCard({ user, style }: UserCardProps) {
                             ☘️
                         </div>
 
-                        {/* Avatar with glass effect */}
                         <div className="relative cursor-pointer flex-shrink-0" onClick={handleImageClick}>
-                            {user.hasImage ? (
-                                <Image
-                                    src={getPhotoUrl(user.id, 'small')}
-                                    alt={user.name}
-                                    width={50}
-                                    height={50}
-                                    className="h-[50px] w-[50px] rounded-full object-cover glass-avatar"
-                                    priority={isPriority}
-                                />
-                            ) : (
-                                <Avatar className="h-[50px] w-[50px] glass-avatar">
-                                    <AvatarImage src={`https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&bold=true&color=0D483B`} />
-                                    <AvatarFallback
-                                        style={{
-                                            background: 'rgba(255, 248, 231, 0.9)',
-                                            backdropFilter: 'blur(8px)'
-                                        }}
-                                    >
-                                        <UserIcon className="h-6 w-6" style={{ color: '#0D483B' }} />
-                                    </AvatarFallback>
-                                </Avatar>
-                            )}
+                            <img
+                                src={getPhotoUrl(user.id, 'small')}
+                                alt={user.name}
+                                className="h-[50px] w-[50px] rounded-full object-cover glass-avatar"
+                                loading={isPriority ? 'eager' : 'lazy'}
+                                onError={(e) => {
+                                    e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&bold=true&color=0D483B&size=50`;
+                                }}
+                            />
                         </div>
 
                         {/* User Info */}

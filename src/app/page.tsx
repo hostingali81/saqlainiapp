@@ -35,33 +35,10 @@ async function HomeContent() {
     return 0;
   });
 
-  // List all files in the small_image folder
-  const { data: fileList, error: storageError } = await supabase
-    .storage
-    .from('user-photos')
-    .list('small_image', {
-      limit: 1000,
-      offset: 0,
-      sortBy: { column: 'name', order: 'asc' },
-    });
-
-  // Create a Set of user IDs that have images
-  const existingImages = new Set<string>();
-  if (fileList && !storageError) {
-    fileList.forEach(file => {
-      if (file.name.endsWith('.jpg')) {
-        const userId = file.name.replace('.jpg', '');
-        existingImages.add(userId);
-      }
-    });
-  }
-
-  const usersWithImages = sortedUsers.map(user => {
-    return {
-      ...user,
-      hasImage: existingImages.has(user.id.toString())
-    };
-  });
+  const usersWithImages = sortedUsers.map(user => ({
+    ...user,
+    hasImage: true
+  }));
 
   const totalAmount = totalResult.data || 0;
 

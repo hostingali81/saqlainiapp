@@ -2,7 +2,6 @@ import { getUserProfile } from '@/app/actions/user';
 import { PaymentTimeline } from '@/components/PaymentTimeline';
 import { WhatsAppButton } from '@/components/WhatsAppButton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Phone, User as UserIcon } from 'lucide-react';
 import Link from 'next/link';
@@ -38,41 +37,21 @@ async function ProfileContent({ id }: { id: string }) {
 
             {/* PROFILE HEADER - Exact PHP match + subtle glass */}
             <div className="glass-card rounded-[15px] p-6 mb-6 text-center relative">
-                {/* Profile Image - PHP exact style */}
-                {hasImage ? (
-                    <Image
-                        src={getPhotoUrl(user.id, 'large')}
-                        alt={user.name}
-                        width={150}
-                        height={150}
-                        className="mx-auto mb-4 rounded-full object-cover"
-                        style={{
-                            border: '3px solid #C6A869',
-                            padding: '3px',
-                            background: '#FFF8E7'
-                        }}
-                    />
-                ) : (
-                    <Avatar
-                        className="mx-auto mb-4"
-                        style={{
-                            width: '150px',
-                            height: '150px',
-                            border: '3px solid #C6A869',
-                            background: '#FFF8E7'
-                        }}
-                    >
-                        <AvatarImage src={`https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&bold=true&color=0D483B&size=300`} />
-                        <AvatarFallback
-                            style={{
-                                background: 'rgba(255, 248, 231, 0.9)',
-                                backdropFilter: 'blur(8px)'
-                            }}
-                        >
-                            <UserIcon className="h-16 w-16" style={{ color: '#0D483B' }} />
-                        </AvatarFallback>
-                    </Avatar>
-                )}
+                <img
+                    src={getPhotoUrl(user.id, 'large')}
+                    alt={user.name}
+                    className="mx-auto mb-4 rounded-full object-cover"
+                    style={{
+                        border: '3px solid #C6A869',
+                        padding: '3px',
+                        background: '#FFF8E7',
+                        width: '150px',
+                        height: '150px'
+                    }}
+                    onError={(e) => {
+                        e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&bold=true&color=0D483B&size=300`;
+                    }}
+                />
 
                 {/* Profile Name - PHP style */}
                 <h2

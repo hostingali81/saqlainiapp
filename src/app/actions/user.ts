@@ -30,7 +30,10 @@ export async function getUserProfile(userId: number) {
         return { error: 'Failed to fetch payments' };
     }
 
-    const user: User = userData;
+    const user: User = {
+        ...userData,
+        hasImage: true
+    };
     const payments: Payment[] = paymentData || [];
 
     const financials = calculateUserFinancials(user, payments);
