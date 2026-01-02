@@ -5,7 +5,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { User } from '@/types';
 import { Camera, Upload, Trash2, ZoomIn, ZoomOut } from 'lucide-react';
-import Image from 'next/image';
 import Cropper from 'react-easy-crop';
 import { getCroppedImg } from '@/lib/cropImage';
 import { getPhotoUrl } from '@/lib/utils';
@@ -145,7 +144,7 @@ export function PhotoUploadModal({ user, isOpen, onClose, onSuccess }: PhotoUplo
     const hasImage = user.hasImage;
     const currentImageUrl = hasImage
         ? `${getPhotoUrl(user.id, 'large')}?v=${Date.now()}`
-        : `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&bold=true&color=666&size=300`;
+        : `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&bold=true&color=0D483B&size=300`;
 
     return (
         <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -168,13 +167,13 @@ export function PhotoUploadModal({ user, isOpen, onClose, onSuccess }: PhotoUplo
 
                             {/* Current Photo */}
                             <div className="flex justify-center">
-                                <Image
+                                <img
                                     src={currentImageUrl}
                                     alt={user.name}
-                                    width={150}
-                                    height={150}
                                     className="w-32 h-32 rounded-full object-cover border-2 border-gray-200"
-                                    unoptimized
+                                    onError={(e) => {
+                                        e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&bold=true&color=0D483B&size=300`;
+                                    }}
                                 />
                             </div>
 

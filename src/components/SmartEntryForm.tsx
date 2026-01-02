@@ -70,7 +70,7 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
         .map(u => ({
             value: u.id.toString(),
             label: `${u.name} - ${u.fname} (${u.bakaya_month} Due)`,
-            image: u.hasImage ? getPhotoUrl(u.id, 'small') : `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name)}&size=32&background=0D483B&color=FFF8E7&bold=true`
+            image: getPhotoUrl(u.id, 'small')
         }));
 
     const calculateAllocations = () => {

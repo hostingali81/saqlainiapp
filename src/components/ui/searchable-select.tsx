@@ -113,7 +113,11 @@ export function SearchableSelect({ options, value, onChange, placeholder = "Sele
                                         <img
                                             src={option.image}
                                             alt=""
-                                            className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                                            className="w-8 h-8 rounded-full object-cover flex-shrink-0 bg-gray-200"
+                                            onError={(e) => {
+                                                const name = option.label.split(' - ')[0] || 'User';
+                                                e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&bold=true&color=0D483B&size=32`;
+                                            }}
                                         />
                                     )}
                                     <span className="flex-1">{option.label}</span>

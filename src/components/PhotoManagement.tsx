@@ -19,18 +19,15 @@ export function PhotoManagement({ users }: PhotoManagementProps) {
 
     const selectedUser = users.find(u => u.id.toString() === selectedUserId);
 
-    // Convert users to options format
+    // Convert users to options format - try loading actual photos first
     const userOptions = users.map(u => ({
         value: u.id.toString(),
         label: `${u.name} - ${u.fname}`,
-        image: u.hasImage ? getPhotoUrl(u.id, 'small') : `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name)}&size=32&background=0D483B&color=FFF8E7&bold=true`
+        image: getPhotoUrl(u.id, 'small')
     }));
 
-    const hasImage = selectedUser?.hasImage;
     const currentImageUrl = selectedUser
-        ? (hasImage
-            ? `${getPhotoUrl(selectedUser.id, 'large')}?v=${Date.now()}`
-            : `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedUser.name)}&bold=true&color=666&size=300`)
+        ? getPhotoUrl(selectedUser.id, 'large')
         : '';
 
     const handleDelete = async () => {
@@ -88,6 +85,9 @@ export function PhotoManagement({ users }: PhotoManagementProps) {
                                         alt={selectedUser.name}
                                         className="w-40 h-40 rounded-full object-cover border-4 border-gray-200"
                                         loading="eager"
+                                        onError={(e) => {
+                                            e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedUser.name)}&bold=true&color=0D483B&size=300`;
+                                        }}
                                     />
                                 </div>
                                 <p className="text-sm text-muted-foreground mt-2">
@@ -108,7 +108,7 @@ export function PhotoManagement({ users }: PhotoManagementProps) {
                                     <Camera className="h-4 w-4 mr-2" />
                                     Change Photo
                                 </Button>
-                                {hasImage && (
+                                {selectedUser.hasImage && (
                                     <Button
                                         onClick={handleDelete}
                                         variant="destructive"
