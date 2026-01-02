@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { User } from '@/types';
-import { Camera, Upload, Trash2, ZoomIn, ZoomOut } from 'lucide-react';
+import { Camera, Upload, Trash2, ZoomIn, ZoomOut, X } from 'lucide-react';
 import Cropper from 'react-easy-crop';
 import { getCroppedImg } from '@/lib/cropImage';
 import { getPhotoUrl } from '@/lib/utils';
@@ -24,7 +24,6 @@ export function PhotoUploadModal({ user, isOpen, onClose, onSuccess }: PhotoUplo
     const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
     const [uploading, setUploading] = useState(false);
 
-    // Cleanup object URLs to avoid memory leaks
     useEffect(() => {
         return () => {
             if (previewUrl && previewUrl.startsWith('blob:')) {
@@ -53,27 +52,13 @@ export function PhotoUploadModal({ user, isOpen, onClose, onSuccess }: PhotoUplo
         setUploading(true);
 
         try {
-            // Generate Large Image (300x300)
-            const largeBlob = await getCroppedImg(
-                previewUrl,
-                croppedAreaPixels,
-                300,
-                300
-            );
-
-            // Generate Small Image (70x70)
-            const smallBlob = await getCroppedImg(
-                previewUrl,
-                croppedAreaPixels,
-                70,
-                70
-            );
+            const largeBlob = await getCroppedImg(previewUrl, croppedAreaPixels, 300, 300);
+            const smallBlob = await getCroppedImg(previewUrl, croppedAreaPixels, 70, 70);
 
             if (!largeBlob || !smallBlob) {
                 throw new Error('Failed to crop image');
             }
 
-            // Upload
             const formData = new FormData();
             formData.append('largeImage', largeBlob, `${user.id}.jpg`);
             formData.append('smallImage', smallBlob, `${user.id}.jpg`);
@@ -143,68 +128,76 @@ export function PhotoUploadModal({ user, isOpen, onClose, onSuccess }: PhotoUplo
 
     return (
         <Dialog open={isOpen} onOpenChange={handleClose}>
-            <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
-                <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                        <Camera className="h-5 w-5" />
-                        Change Photo
-                    </DialogTitle>
-                </DialogHeader>
+            <DialogContent className="w-full sm:max-w-2xl max-h-[95vh] p-0 gap-0 overflow-hidden flex flex-col">
+                {/* Header */}
+                <div className="px-4 py-3 border-b flex items-center justify-between bg-gradient-to-r from-primary/5 to-primary/10">
+                    <div className="flex items-center gap-2">
+                        <Camera className="h-5 w-5 text-primary" />
+                        <h2 className="font-semibold text-lg">Photo Management</h2>
+                    </div>
+                    <button onClick={handleClose} className="p-1 hover:bg-gray-100 rounded-full">
+                        <X className="h-5 w-5" />
+                    </button>
+                </div>
 
-                <div className="space-y-4">
+                {/* Content */}
+                <div className="flex-1 overflow-y-auto p-4 sm:p-6">
                     {!selectedFile ? (
-                        <>
+                        <div className="space-y-6">
                             {/* User Info */}
                             <div className="text-center">
-                                <h3 className="font-semibold">{user.name}</h3>
-                                <p className="text-sm text-muted-foreground">{user.fname}</p>
+                                <h3 className="font-bold text-xl text-primary">{user.name}</h3>
+                                <p className="text-sm text-muted-foreground mt-1">{user.fname}</p>
                             </div>
 
                             {/* Current Photo */}
                             <div className="flex justify-center">
-                                <img
-                                    src={currentImageUrl}
-                                    alt={user.name}
-                                    className="w-32 h-32 rounded-full object-cover border-2 border-gray-200"
-                                    onError={(e) => {
-                                        e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&bold=true&color=0D483B&size=300`;
-                                    }}
-                                />
+                                <div className="relative">
+                                    <img
+                                        src={currentImageUrl}
+                                        alt={user.name}
+                                        className="w-56 h-56 sm:w-64 sm:h-64 rounded-full object-cover border-4 border-primary/20 shadow-lg"
+                                        onError={(e) => {
+                                            e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&bold=true&color=0D483B&size=300`;
+                                        }}
+                                    />
+                                </div>
                             </div>
 
-                            {/* File Input */}
-                            <div>
+                            {/* Action Buttons */}
+                            <div className="space-y-3">
                                 <label className="block">
                                     <input
                                         type="file"
                                         accept="image/*"
                                         onChange={handleFileSelect}
                                         className="hidden"
-                                        id="photo-upload"
+                                        id="photo-upload-input"
                                     />
-                                    <Button asChild variant="outline" className="w-full">
-                                        <label htmlFor="photo-upload" className="cursor-pointer">
-                                            <Upload className="h-4 w-4 mr-2" />
-                                            Select Photo
+                                    <Button asChild className="w-full h-12 text-base" size="lg">
+                                        <label htmlFor="photo-upload-input" className="cursor-pointer">
+                                            <Upload className="h-5 w-5 mr-2" />
+                                            Select New Photo
                                         </label>
                                     </Button>
                                 </label>
-                            </div>
 
-                            <Button
-                                onClick={deletePhoto}
-                                disabled={uploading}
-                                variant="destructive"
-                                className="w-full"
-                            >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Delete Current Photo
-                            </Button>
-                        </>
+                                <Button
+                                    onClick={deletePhoto}
+                                    disabled={uploading}
+                                    variant="destructive"
+                                    className="w-full h-12 text-base"
+                                    size="lg"
+                                >
+                                    <Trash2 className="h-5 w-5 mr-2" />
+                                    Delete Photo
+                                </Button>
+                            </div>
+                        </div>
                     ) : (
-                        <>
-                            {/* Cropper UI */}
-                            <div className="relative w-full h-64 bg-gray-900 rounded-lg overflow-hidden touch-none">
+                        <div className="space-y-4">
+                            {/* Cropper */}
+                            <div className="relative w-full h-[50vh] sm:h-[60vh] bg-gray-900 rounded-lg overflow-hidden">
                                 <Cropper
                                     image={previewUrl}
                                     crop={crop}
@@ -217,46 +210,53 @@ export function PhotoUploadModal({ user, isOpen, onClose, onSuccess }: PhotoUplo
                                 />
                             </div>
 
-                            {/* Zoom Slider */}
-                            <div className="flex items-center gap-2">
-                                <ZoomOut className="h-4 w-4 text-muted-foreground" />
-                                <input
-                                    type="range"
-                                    value={zoom}
-                                    min={1}
-                                    max={3}
-                                    step={0.1}
-                                    aria-labelledby="Zoom"
-                                    onChange={(e) => setZoom(Number(e.target.value))}
-                                    className="flex-1"
-                                />
-                                <ZoomIn className="h-4 w-4 text-muted-foreground" />
+                            {/* Zoom Control */}
+                            <div className="space-y-2">
+                                <label className="text-sm font-medium flex items-center justify-between">
+                                    <span>Zoom Level</span>
+                                    <span className="text-muted-foreground">{zoom.toFixed(1)}x</span>
+                                </label>
+                                <div className="flex items-center gap-3">
+                                    <ZoomOut className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                                    <input
+                                        type="range"
+                                        value={zoom}
+                                        min={1}
+                                        max={3}
+                                        step={0.1}
+                                        onChange={(e) => setZoom(Number(e.target.value))}
+                                        className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary"
+                                    />
+                                    <ZoomIn className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                                </div>
                             </div>
-
-                            {/* Actions */}
-                            <div className="flex gap-2 pt-2">
-                                <Button
-                                    variant="outline"
-                                    onClick={() => {
-                                        setSelectedFile(null);
-                                        setPreviewUrl('');
-                                    }}
-                                    disabled={uploading}
-                                    className="flex-1"
-                                >
-                                    Cancel
-                                </Button>
-                                <Button
-                                    onClick={cropAndUpload}
-                                    disabled={uploading}
-                                    className="flex-1"
-                                >
-                                    {uploading ? 'Uploading...' : 'Save & Upload'}
-                                </Button>
-                            </div>
-                        </>
+                        </div>
                     )}
                 </div>
+
+                {/* Footer */}
+                {selectedFile && (
+                    <div className="px-4 py-3 border-t bg-gray-50 flex gap-3">
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                setSelectedFile(null);
+                                setPreviewUrl('');
+                            }}
+                            disabled={uploading}
+                            className="flex-1 h-11"
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={cropAndUpload}
+                            disabled={uploading}
+                            className="flex-1 h-11"
+                        >
+                            {uploading ? 'Uploading...' : 'Save Photo'}
+                        </Button>
+                    </div>
+                )}
             </DialogContent>
         </Dialog>
     );

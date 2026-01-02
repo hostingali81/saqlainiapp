@@ -24,14 +24,14 @@ export function Dialog({ open, onOpenChange, children }: SimpleDialogProps) {
     if (!open) return null;
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4">
             {/* Backdrop */}
             <div
                 className="absolute inset-0 bg-black/50 backdrop-blur-sm"
                 onClick={() => onOpenChange(false)}
             />
             {/* Content */}
-            <div className="relative z-10">
+            <div className="relative z-10 w-full flex items-center justify-center">
                 {children}
             </div>
         </div>
@@ -40,7 +40,7 @@ export function Dialog({ open, onOpenChange, children }: SimpleDialogProps) {
 
 export function DialogContent({ children, className = '' }: { children: React.ReactNode; className?: string }) {
     return (
-        <div className={`relative bg-white rounded-lg shadow-xl max-w-lg w-full mx-auto p-4 sm:p-6 ${className}`}>
+        <div className={`relative bg-white rounded-lg shadow-xl max-w-lg w-full p-4 sm:p-6 ${className}`}>
             {children}
         </div>
     );
