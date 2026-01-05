@@ -186,6 +186,7 @@ export function ExpensesForm() {
     useEffect(() => {
         const fetchData = async () => {
             setLoading(true);
+            setStats(null);
             const [expenseResponse, statsData] = await Promise.all([
                 getExpenses(page, 50, category),
                 getExpensePageStats(category)
