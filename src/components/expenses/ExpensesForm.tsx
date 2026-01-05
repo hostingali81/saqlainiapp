@@ -186,9 +186,13 @@ export function ExpensesForm() {
     useEffect(() => {
         const fetchData = async () => {
             setLoading(true);
-            const expenseResponse = await getExpenses(page, 50, category);
+            const [expenseResponse, statsData] = await Promise.all([
+                getExpenses(page, 50, category),
+                getExpensePageStats(category)
+            ]);
             setExpenses(expenseResponse.data);
             setTotal(expenseResponse.total);
+            setStats(statsData);
             setLoading(false);
         };
         fetchData();
@@ -196,11 +200,7 @@ export function ExpensesForm() {
 
     useEffect(() => {
         const init = async () => {
-            const [statsData, cats] = await Promise.all([
-                getExpensePageStats(),
-                getCategories()
-            ]);
-            setStats(statsData);
+            const cats = await getCategories();
             setCategories(['All', ...cats]);
         };
         init();

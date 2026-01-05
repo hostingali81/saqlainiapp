@@ -165,31 +165,22 @@ async function getChandaEntriesLegacy(search: string = '') {
 
 // ... keep getCategories ...
 
-export async function getExpensePageStats() {
+export async function getExpensePageStats(category?: string) {
     const supabase = await createClient();
 
-    // Use database function for better performance
-    const { data, error } = await supabase.rpc('get_expense_stats');
-
-    if (error || !data || data.length === 0) {
-        console.error('Error fetching stats:', error);
-        // Fallback to old method
-        const { data: expenses } = await supabase
-            .from('expenses')
-            .select('amount, category');
-
-        const totalAmount = expenses?.reduce((sum, item) => sum + (item.amount || 0), 0) || 0;
-        const totalTransactions = expenses?.length || 0;
-        const totalCategories = new Set(expenses?.map(e => e.category).filter(Boolean)).size;
-
-        return { totalAmount, totalTransactions, totalCategories };
+    let query = supabase.from('expenses').select('amount, category');
+    
+    if (category && category !== 'All') {
+        query = query.eq('category', category);
     }
 
-    return {
-        totalAmount: data[0].total_amount || 0,
-        totalTransactions: Number(data[0].total_transactions) || 0,
-        totalCategories: Number(data[0].total_categories) || 0
-    };
+    const { data: expenses } = await query;
+
+    const totalAmount = expenses?.reduce((sum, item) => sum + (item.amount || 0), 0) || 0;
+    const totalTransactions = expenses?.length || 0;
+    const totalCategories = new Set(expenses?.map(e => e.category).filter(Boolean)).size;
+
+    return { totalAmount, totalTransactions, totalCategories };
 }
 
 export async function getCategories() {
