@@ -126,7 +126,7 @@ export async function processSmartPayment(
         const paymentDate = now.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
 
         const rows = allocations.map(allocation => {
-            const monthFormatted = `01/${allocation.month.toString().padStart(2, '0')}/${allocation.year}`;
+            const monthFormatted = `${allocation.month.toString().padStart(2, '0')}/01/${allocation.year}`;
             const monthKey = `${allocation.year}-${allocation.month}`;
             return [
                 timestamp,
@@ -172,7 +172,7 @@ export async function createNewUserPayment(data: {
         const now = new Date();
         const timestamp = now.toLocaleString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }).replace(',', '');
         const paymentDate = now.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
-        const monthFormatted = `01/${currentMonth.toString().padStart(2, '0')}/${currentYear}`;
+        const monthFormatted = `${currentMonth.toString().padStart(2, '0')}/01/${currentYear}`;
 
         const row = [
             timestamp,
