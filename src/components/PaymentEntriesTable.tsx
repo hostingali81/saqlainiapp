@@ -106,7 +106,7 @@ export function PaymentEntriesTable({ refreshTrigger }: { refreshTrigger?: numbe
                                     {entries.map((entry) => (
                                         <tr key={entry.rowIndex} className="border-b hover:bg-muted/50">
                                             <td className="p-2 whitespace-nowrap">{entry.name}</td>
-                                            <td className="p-2">{entry.paymentDate}</td>
+                                            <td className="p-2">{entry.paymentDate ? new Date(entry.paymentDate).toLocaleDateString('en-GB') : '-'}</td>
                                             <td className="p-2">₹{entry.amount}</td>
                                             <td className="p-2">{entry.monthName}</td>
                                             <td className="p-2 text-xs text-muted-foreground">{entry.remarks || '-'}</td>

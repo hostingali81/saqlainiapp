@@ -266,7 +266,7 @@ export function FormExpensesClient({ existingNames }: FormExpensesClientProps) {
                                     <td className="p-3 text-xs" style={{ color: '#165E4B' }}>{entry.timestamp}</td>
                                     <td className="p-3 text-xs" style={{ color: '#4A3728' }}>{entry.name}</td>
                                     <td className="p-3 text-xs" style={{ color: '#4A3728' }}>{entry.description}</td>
-                                    <td className="p-3 text-xs" style={{ color: '#165E4B' }}>{entry.paymentDate}</td>
+                                    <td className="p-3 text-xs" style={{ color: '#165E4B' }}>{entry.paymentDate ? new Date(entry.paymentDate).toLocaleDateString('en-GB') : '-'}</td>
                                     <td className="p-3 text-xs font-bold" style={{ color: '#059669' }}>₹{entry.amount}</td>
                                     <td className="p-3 text-xs" style={{ color: '#165E4B' }}>{entry.remark}</td>
                                     <td className="p-3 text-xs font-bold" style={{ color: '#0D483B', background: '#E5D3AA' }}>{entry.head || 'N/A'}</td>

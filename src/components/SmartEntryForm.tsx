@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { User, MonthStatus } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,6 +30,7 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
     const [dueMonths, setDueMonths] = useState<MonthStatus[]>([]);
     const [loadingMonths, setLoadingMonths] = useState(false);
     const [allocatedMonths, setAllocatedMonths] = useState<Array<{ month: MonthStatus, amount: number }>>([]);
+    const amountInputRef = useRef<HTMLInputElement>(null);
 
     // New Entry Form States
     const [newEntryData, setNewEntryData] = useState({
@@ -56,10 +57,16 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
                 }
                 setLoadingMonths(false);
             });
+            
+            if (!showNewEntryForm) {
+                setTimeout(() => {
+                    amountInputRef.current?.focus();
+                }, 100);
+            }
         } else {
             setDueMonths([]);
         }
-    }, [selectedUserId]);
+    }, [selectedUserId, showNewEntryForm]);
 
     const userOptions = users
         .sort((a, b) => {
@@ -240,11 +247,11 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
 
     return (
         <>
-            <Card className="w-full max-w-lg mx-auto border-t-4 border-t-secondary">
+            <Card className="w-full max-w-lg mx-auto border-t-4 border-t-secondary mb-6">
                 <CardHeader>
                     <CardTitle>Payment Entry</CardTitle>
                 </CardHeader>
-                <CardContent className="space-y-4">
+                <CardContent className="space-y-4 pb-32">
                     <div className="space-y-2">
                         <label className="text-sm font-medium">Select User</label>
                         <SearchableSelect
@@ -358,23 +365,6 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
                         </div>
                     )}
 
-                    {!showNewEntryForm && (
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Paid Amount (₹)</label>
-                            <Input
-                                type="number"
-                                placeholder="e.g. 500"
-                                value={amount}
-                                onChange={(e) => setAmount(e.target.value)}
-                            />
-                            {amount && (
-                                <p className="text-xs text-muted-foreground">
-                                    Will clear approx <strong>{Math.floor(parseInt(amount) / 125)}</strong> months.
-                                </p>
-                            )}
-                        </div>
-                    )}
-
                     {!showNewEntryForm && selectedUser && selectedUser.frequency !== 'One Time' && (
                         loadingMonths ? (
                             <div className="text-sm text-muted-foreground text-center p-2">Loading due months...</div>
@@ -450,6 +440,30 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
                                     ));
                                 })()}
                             </div>
+                        </div>
+                    )}
+
+                    {!showNewEntryForm && (
+                        <div className="space-y-2">
+                            <label className="text-sm font-medium">Paid Amount (₹)</label>
+                            <Input
+                                ref={amountInputRef}
+                                type="number"
+                                placeholder="e.g. 500"
+                                value={amount}
+                                onChange={(e) => setAmount(e.target.value)}
+                                onKeyDown={(e) => {
+                                    if (e.key === 'Enter' && selectedUserId && amount) {
+                                        e.preventDefault();
+                                        handlePayment();
+                                    }
+                                }}
+                            />
+                            {amount && (
+                                <p className="text-xs text-muted-foreground">
+                                    Will clear approx <strong>{Math.floor(parseInt(amount) / 125)}</strong> months.
+                                </p>
+                            )}
                         </div>
                     )}
 
