@@ -37,13 +37,11 @@ export function UserCard({ user, style, index = 0 }: UserCardProps) {
 
     return (
         <>
-            {/* content-visibility lets the browser skip layout and paint for cards
-                that are scrolled out of view - the cheap alternative to
-                virtualising a long member list. */}
-            <div
-                style={{ ...style, contentVisibility: 'auto', containIntrinsicSize: '82px' }}
-                className="p-2"
-            >
+            {/* No content-visibility here on purpose: it gives off-screen cards a
+                placeholder height, so the container total height - and therefore a
+                restored scrollTop - drifts unless the estimate is exact. Correct
+                scroll restoration is worth more than the paint saving. */}
+            <div style={style} className="p-2">
                 <Link href={`/profile/${user.id}`} prefetch={true}>
                     {/* GLASSMORPHISM CARD */}
                     <div className="glass-card rounded-[15px] p-4 flex items-center gap-3 relative overflow-hidden">
