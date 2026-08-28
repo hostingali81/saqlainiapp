@@ -107,7 +107,16 @@ export async function processSmartPayment(
     amount: number,
     remarks: Record<string, string> = {},
     customAllocations?: Array<{ year: number, month: number, monthName?: string, amount: number }>,
-    allocationChoice?: AllocationChoice
+    allocationChoice?: AllocationChoice,
+    /**
+     * Months the form could see were ALREADY paid and is deliberately adding to
+     * anyway (an up-to-date member paying again, an advance, a top-up).
+     *
+     * This is what separates an intentional extra payment from a stale form:
+     * a stale form still believes those months are due, so it never lists them
+     * here and the duplicate guard below still catches it.
+     */
+    acknowledgedPaidMonths?: string[]
 ): Promise<PaymentActionResult> {
     const auth = await requireAdmin();
     if ('error' in auth) return { error: auth.error };
@@ -157,12 +166,13 @@ export async function processSmartPayment(
     const paidKeys = new Set(
         financials.history.filter(h => h.status === 'paid').map(h => `${h.year}-${h.month}`)
     );
-    // The one month an already-paid allocation is allowed against: the current
-    // month, and only when the admin deliberately chose to top it up. A stale
-    // client never sets this, so the duplicate-payment guard still holds.
-    const topUpKey = (mustChoose && allocationChoice === 'currentMonth')
-        ? `${currentYear}-${currentMonth}`
-        : null;
+    // Already-paid months the form knowingly targeted.
+    const acknowledged = new Set(acknowledgedPaidMonths ?? []);
+    // Picking "top up the current month" in the ambiguous-amount prompt is itself
+    // an acknowledgement.
+    if (mustChoose && allocationChoice === 'currentMonth') {
+        acknowledged.add(`${currentYear}-${currentMonth}`);
+    }
     const seen = new Set<string>();
     let allocatedTotal = 0;
 
@@ -183,7 +193,7 @@ export async function processSmartPayment(
         }
         seen.add(key);
 
-        if (paidKeys.has(key) && key !== topUpKey) {
+        if (paidKeys.has(key) && !acknowledged.has(key)) {
             return { error: `${a.monthName || key} is already paid. Please reload the form and try again.` };
         }
 

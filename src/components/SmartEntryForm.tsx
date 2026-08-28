@@ -164,6 +164,30 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
         [allocations, amountFor]
     );
 
+    /**
+     * Months in this allocation that the member has ALREADY paid for.
+     *
+     * Happens whenever someone who is fully up to date pays again: there are no
+     * due months left, so the whole amount lands on the current month. That is a
+     * legitimate extra payment, so the form tells the server it knows about it.
+     * A stale form would still think those months were due and would not list
+     * them, which is how the duplicate-payment guard stays effective.
+     */
+    const alreadyPaidAllocations = useMemo(
+        () => allocations
+            .map(a => ({
+                allocation: a,
+                existing: history.find(h => h.year === a.year && h.month === a.month && h.status === 'paid')
+            }))
+            .filter((x): x is { allocation: PaymentAllocation; existing: MonthStatus } => !!x.existing),
+        [allocations, history]
+    );
+
+    const acknowledgedPaidMonths = useMemo(
+        () => alreadyPaidAllocations.map(x => monthKeyOf(x.allocation)),
+        [alreadyPaidAllocations]
+    );
+
     // Allocated months that are not in the due list - i.e. a top-up onto an
     // already-paid month, which the due-month chips cannot show.
     const outsideDueAllocations = useMemo(
@@ -199,7 +223,8 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
                 amountNum,
                 remarks,
                 finalAllocations,
-                effectiveChoice
+                effectiveChoice,
+                acknowledgedPaidMonths
             );
             setResult(res);
 
@@ -503,6 +528,21 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
                                     Month-wise total is ₹{allocatedTotal} but the paid amount is ₹{amountNum}. Fix the amounts under Remarks.
                                 </p>
                             )}
+                        </div>
+                    )}
+
+                    {/* An up-to-date member paying again lands on a month that is
+                        already paid. That is fine, but the admin should see it
+                        stated rather than just a green chip. */}
+                    {!showNewEntryForm && !needsChoice && alreadyPaidAllocations.length > 0 && (
+                        <div className="rounded-md border border-amber-300 bg-amber-50 p-3 space-y-1">
+                            <p className="text-sm font-semibold text-amber-900">Already paid — this will be added on top</p>
+                            {alreadyPaidAllocations.map(({ allocation, existing }) => (
+                                <p key={monthKeyOf(allocation)} className="text-xs text-amber-800">
+                                    {existing.monthName} {existing.year} already has ₹{existing.amount} paid.
+                                    Adding ₹{amountFor(allocation)} makes it ₹{existing.amount + amountFor(allocation)}.
+                                </p>
+                            ))}
                         </div>
                     )}
 
