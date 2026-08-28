@@ -1,49 +1,54 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { getPaymentEntries, updatePaymentEntry, deletePaymentEntry } from '@/app/actions/payments';
+import { PaymentEntryRow } from '@/types';
 import { Pencil, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
 
-interface PaymentEntry {
-    rowIndex: number;
-    timestamp: string;
-    name: string;
-    paymentDate: string;
-    amount: string;
-    month: string;
-    monthName: string;
-    year: string;
-    remarks: string;
-    phone: string;
+/** MM/DD/YYYY from the sheet -> DD/MM/YYYY, without rendering "Invalid Date". */
+function formatDate(value: string) {
+    if (!value) return '-';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return value;
+    return parsed.toLocaleDateString('en-GB');
 }
 
 export function PaymentEntriesTable({ refreshTrigger }: { refreshTrigger?: number }) {
-    const [entries, setEntries] = useState<PaymentEntry[]>([]);
+    const [entries, setEntries] = useState<PaymentEntryRow[]>([]);
     const [total, setTotal] = useState(0);
     const [page, setPage] = useState(1);
     const [perPage] = useState(10);
     const [loading, setLoading] = useState(true);
-    const [editEntry, setEditEntry] = useState<PaymentEntry | null>(null);
+    const [error, setError] = useState<string | null>(null);
+    const [editEntry, setEditEntry] = useState<PaymentEntryRow | null>(null);
     const [editData, setEditData] = useState<any>({});
+    const [editError, setEditError] = useState<string | null>(null);
+    const [saving, setSaving] = useState(false);
     const [showEditDialog, setShowEditDialog] = useState(false);
 
-    const loadEntries = async () => {
+    const loadEntries = useCallback(async () => {
         setLoading(true);
+        setError(null);
         const result = await getPaymentEntries(page, perPage);
+        if (result.error) setError(result.error);
         setEntries(result.entries);
         setTotal(result.total);
+        // The server clamps the page (e.g. after deleting the last row of the
+        // last page); mirror it so the controls stay in sync.
+        if (result.page !== page) setPage(result.page);
         setLoading(false);
-    };
+    }, [page, perPage]);
 
     useEffect(() => {
         loadEntries();
-    }, [page, refreshTrigger]);
+    }, [loadEntries, refreshTrigger]);
 
-    const handleEdit = (entry: PaymentEntry) => {
+    const handleEdit = (entry: PaymentEntryRow) => {
         setEditEntry(entry);
+        setEditError(null);
         setEditData({
             timestamp: entry.timestamp,
             name: entry.name,
@@ -61,28 +66,55 @@ export function PaymentEntriesTable({ refreshTrigger }: { refreshTrigger?: numbe
     const handleSaveEdit = async () => {
         if (!editEntry) return;
 
-        const result = await updatePaymentEntry(editEntry.rowIndex, editData);
+        setSaving(true);
+        setEditError(null);
+
+        // The original values identify the row; `editData` may have been changed.
+        const result = await updatePaymentEntry(editEntry.rowIndex, editData, {
+            timestamp: editEntry.timestamp,
+            name: editEntry.name
+        });
+
+        setSaving(false);
+
         if (result.success) {
             setShowEditDialog(false);
+            setEditEntry(null);
             loadEntries();
+        } else {
+            setEditError(result.error || 'Could not save the entry.');
         }
     };
 
-    const handleDelete = async (entry: PaymentEntry) => {
+    const handleDelete = async (entry: PaymentEntryRow) => {
         if (!confirm(`Delete entry for ${entry.name}?`)) return;
 
-        const result = await deletePaymentEntry(entry.rowIndex);
+        setError(null);
+        const result = await deletePaymentEntry(entry.rowIndex, {
+            timestamp: entry.timestamp,
+            name: entry.name
+        });
+
         if (result.success) {
             loadEntries();
+        } else {
+            setError(result.error || 'Could not delete the entry.');
         }
     };
 
-    const totalPages = Math.ceil(total / perPage);
+    const totalPages = Math.max(1, Math.ceil(total / perPage));
 
     return (
         <>
             <div className="mt-8">
                 <h2 className="text-xl font-bold mb-4">Recent Payment Entries</h2>
+
+                {error && (
+                    <div className="mb-3 p-3 rounded-md bg-red-100 text-red-800 text-sm flex items-center justify-between gap-3">
+                        <span>{error}</span>
+                        <Button size="sm" variant="outline" onClick={loadEntries}>Refresh</Button>
+                    </div>
+                )}
 
                 {loading ? (
                     <div className="text-center p-4">Loading...</div>
@@ -106,7 +138,7 @@ export function PaymentEntriesTable({ refreshTrigger }: { refreshTrigger?: numbe
                                     {entries.map((entry) => (
                                         <tr key={entry.rowIndex} className="border-b hover:bg-muted/50">
                                             <td className="p-2 whitespace-nowrap">{entry.name}</td>
-                                            <td className="p-2">{entry.paymentDate ? new Date(entry.paymentDate).toLocaleDateString('en-GB') : '-'}</td>
+                                            <td className="p-2">{formatDate(entry.paymentDate)}</td>
                                             <td className="p-2">₹{entry.amount}</td>
                                             <td className="p-2">{entry.monthName}</td>
                                             <td className="p-2 text-xs text-muted-foreground">{entry.remarks || '-'}</td>
@@ -143,7 +175,7 @@ export function PaymentEntriesTable({ refreshTrigger }: { refreshTrigger?: numbe
                                 <Button
                                     size="sm"
                                     variant="outline"
-                                    disabled={page === 1}
+                                    disabled={page <= 1}
                                     onClick={() => setPage(page - 1)}
                                 >
                                     <ChevronLeft className="h-4 w-4" />
@@ -154,7 +186,7 @@ export function PaymentEntriesTable({ refreshTrigger }: { refreshTrigger?: numbe
                                 <Button
                                     size="sm"
                                     variant="outline"
-                                    disabled={page === totalPages}
+                                    disabled={page >= totalPages}
                                     onClick={() => setPage(page + 1)}
                                 >
                                     <ChevronRight className="h-4 w-4" />
@@ -172,6 +204,9 @@ export function PaymentEntriesTable({ refreshTrigger }: { refreshTrigger?: numbe
                         <DialogTitle>Edit Payment Entry</DialogTitle>
                     </DialogHeader>
                     <div className="space-y-3 overflow-y-auto flex-1 pr-2">
+                        {editError && (
+                            <div className="p-3 rounded-md bg-red-100 text-red-800 text-sm">{editError}</div>
+                        )}
                         <div>
                             <label className="text-sm font-medium">Name</label>
                             <Input
@@ -183,6 +218,7 @@ export function PaymentEntriesTable({ refreshTrigger }: { refreshTrigger?: numbe
                             <label className="text-sm font-medium">Amount</label>
                             <Input
                                 type="number"
+                                min={1}
                                 value={editData.amount || ''}
                                 onChange={(e) => setEditData({ ...editData, amount: e.target.value })}
                             />
@@ -199,6 +235,8 @@ export function PaymentEntriesTable({ refreshTrigger }: { refreshTrigger?: numbe
                             <label className="text-sm font-medium">Month (No.)</label>
                             <Input
                                 type="number"
+                                min={1}
+                                max={12}
                                 value={editData.month || ''}
                                 onChange={(e) => setEditData({ ...editData, month: e.target.value })}
                             />
@@ -227,11 +265,11 @@ export function PaymentEntriesTable({ refreshTrigger }: { refreshTrigger?: numbe
                         </div>
                     </div>
                     <DialogFooter className="flex-row gap-2 pt-4">
-                        <Button variant="outline" onClick={() => setShowEditDialog(false)} className="flex-1">
+                        <Button variant="outline" onClick={() => setShowEditDialog(false)} className="flex-1" disabled={saving}>
                             Cancel
                         </Button>
-                        <Button onClick={handleSaveEdit} className="flex-1">
-                            Save
+                        <Button onClick={handleSaveEdit} className="flex-1" disabled={saving}>
+                            {saving ? 'Saving...' : 'Save'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

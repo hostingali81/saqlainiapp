@@ -38,6 +38,49 @@ export interface UserFinancialSummary {
     history: MonthStatus[];
 }
 
+/** One allocated month inside a payment. */
+export interface AllocatedMonth {
+    year: number;
+    month: number;
+    monthName?: string;
+    amount: number;
+}
+
+export interface PaymentActionResult {
+    success?: boolean;
+    allocated?: AllocatedMonth[];
+    error?: string;
+    /** Saved, but a non-critical follow-up step (sheet write, bakaya refresh) failed. */
+    warning?: string;
+}
+
+export interface SimpleActionResult {
+    success?: boolean;
+    error?: string;
+}
+
+/** A row of the FormResponses sheet as shown in the admin table. */
+export interface PaymentEntryRow {
+    rowIndex: number;
+    timestamp: string;
+    name: string;
+    paymentDate: string;
+    amount: string;
+    month: string;
+    monthName: string;
+    year: string;
+    phone: string;
+    remarks: string;
+}
+
+export interface PaymentEntriesResult {
+    entries: PaymentEntryRow[];
+    total: number;
+    page: number;
+    perPage: number;
+    error?: string;
+}
+
 export interface Expense {
     id: number;
     PaymentDate: string; // Changed from Date to match DB column name

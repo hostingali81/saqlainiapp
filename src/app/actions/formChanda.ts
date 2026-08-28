@@ -1,9 +1,13 @@
 'use server';
 
 import { appendToSheet, getSheetData, updateSheetRow, deleteSheetRow } from '@/lib/sheets';
+import { requireAdmin } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
 
 export async function submitFormChanda(formData: FormData) {
+    const auth = await requireAdmin();
+    if ('error' in auth) return { success: false, error: auth.error };
+
     try {
         const name = formData.get('name') as string;
         const nameHindi = formData.get('nameHindi') as string;
@@ -47,6 +51,9 @@ export async function submitFormChanda(formData: FormData) {
 }
 
 export async function getFormChandaEntries(page: number = 1, perPage: number = 10) {
+    const auth = await requireAdmin();
+    if ('error' in auth) return { entries: [], total: 0, page, perPage, error: auth.error };
+
     try {
         const data = await getSheetData('FormChanda!A:F');
         
@@ -76,6 +83,9 @@ export async function getFormChandaEntries(page: number = 1, perPage: number = 1
 }
 
 export async function updateFormChandaEntry(rowIndex: number, data: any) {
+    const auth = await requireAdmin();
+    if ('error' in auth) return { success: false, error: auth.error };
+
     try {
         const range = `FormChanda!A${rowIndex + 1}:F${rowIndex + 1}`;
         const values = [[
@@ -92,17 +102,20 @@ export async function updateFormChandaEntry(rowIndex: number, data: any) {
         return { success: true };
     } catch (error: any) {
         console.error('Error updating entry:', error);
-        return { error: error.message };
+        return { success: false, error: error.message };
     }
 }
 
 export async function deleteFormChandaEntry(rowIndex: number) {
+    const auth = await requireAdmin();
+    if ('error' in auth) return { success: false, error: auth.error };
+
     try {
         await deleteSheetRow(rowIndex, 639752441);
         revalidatePath('/admin/form-chanda');
         return { success: true };
     } catch (error: any) {
         console.error('Error deleting entry:', error);
-        return { error: error.message };
+        return { success: false, error: error.message };
     }
 }

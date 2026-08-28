@@ -21,6 +21,7 @@ export function FormChandaClient({ existingNames }: FormChandaClientProps) {
     const [editingRow, setEditingRow] = useState<any | null>(null);
     const [editData, setEditData] = useState<any>({});
     const [showEditDialog, setShowEditDialog] = useState(false);
+    const [editMessage, setEditMessage] = useState('');
     const [selectedName, setSelectedName] = useState('');
     const [showNewEntryForm, setShowNewEntryForm] = useState(false);
     const [formData, setFormData] = useState({
@@ -89,24 +90,32 @@ export function FormChandaClient({ existingNames }: FormChandaClientProps) {
 
     async function handleUpdate() {
         if (!editingRow) return;
+        setEditMessage('');
         const result = await updateFormChandaEntry(editingRow.rowIndex, editData);
         if (result.success) {
             setShowEditDialog(false);
             setEditingRow(null);
             loadEntries();
+        } else {
+            setEditMessage(result.error || 'Could not save the entry.');
         }
     }
 
     function handleEdit(entry: any) {
         setEditingRow(entry);
         setEditData(entry);
+        setEditMessage('');
         setShowEditDialog(true);
     }
 
     async function handleDelete(rowIndex: number) {
-        if (confirm('Delete this entry?')) {
-            await deleteFormChandaEntry(rowIndex);
+        if (!confirm('Delete this entry?')) return;
+        setMessage('');
+        const result = await deleteFormChandaEntry(rowIndex);
+        if (result.success) {
             loadEntries();
+        } else {
+            setMessage('✗ Error: ' + (result.error || 'Could not delete the entry.'));
         }
     }
 
@@ -274,6 +283,9 @@ export function FormChandaClient({ existingNames }: FormChandaClientProps) {
                         <DialogTitle>Edit Chanda Entry</DialogTitle>
                     </DialogHeader>
                     <div className="space-y-3">
+                        {editMessage && (
+                            <div className="p-3 rounded-md bg-red-100 text-red-800 text-sm">{editMessage}</div>
+                        )}
                         <div>
                             <label className="text-sm font-medium">Name (English)</label>
                             <Input value={editData.name || ''} onChange={(e) => setEditData({...editData, name: e.target.value})} />

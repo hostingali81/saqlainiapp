@@ -1,9 +1,13 @@
 'use server';
 
 import { appendToSheet, getSheetData, updateSheetRow, deleteSheetRow } from '@/lib/sheets';
+import { requireAdmin } from '@/lib/auth';
 import { revalidatePath } from 'next/cache';
 
 export async function submitFormExpense(formData: FormData) {
+    const auth = await requireAdmin();
+    if ('error' in auth) return { success: false, error: auth.error };
+
     try {
         const name = formData.get('name') as string;
         const description = formData.get('description') as string;
@@ -49,6 +53,9 @@ export async function submitFormExpense(formData: FormData) {
 }
 
 export async function getFormExpenseEntries(page: number = 1, perPage: number = 10) {
+    const auth = await requireAdmin();
+    if ('error' in auth) return { entries: [], total: 0, page, perPage, error: auth.error };
+
     try {
         const data = await getSheetData('FormExpenses!A:G');
         
@@ -79,6 +86,9 @@ export async function getFormExpenseEntries(page: number = 1, perPage: number = 
 }
 
 export async function updateFormExpenseEntry(rowIndex: number, data: any) {
+    const auth = await requireAdmin();
+    if ('error' in auth) return { success: false, error: auth.error };
+
     try {
         const range = `FormExpenses!A${rowIndex + 1}:G${rowIndex + 1}`;
         const values = [[
@@ -96,17 +106,20 @@ export async function updateFormExpenseEntry(rowIndex: number, data: any) {
         return { success: true };
     } catch (error: any) {
         console.error('Error updating entry:', error);
-        return { error: error.message };
+        return { success: false, error: error.message };
     }
 }
 
 export async function deleteFormExpenseEntry(rowIndex: number) {
+    const auth = await requireAdmin();
+    if ('error' in auth) return { success: false, error: auth.error };
+
     try {
         await deleteSheetRow(rowIndex, 958087616);
         revalidatePath('/admin/form-expenses');
         return { success: true };
     } catch (error: any) {
         console.error('Error deleting entry:', error);
-        return { error: error.message };
+        return { success: false, error: error.message };
     }
 }

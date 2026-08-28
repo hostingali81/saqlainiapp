@@ -5,12 +5,7 @@ import { User, Payment, MonthStatus, UserFinancialSummary } from '@/types';
  * Calculates the payment history and due status for a user.
  */
 export function calculateUserFinancials(user: User, payments: Payment[]): UserFinancialSummary {
-    // Force IST timezone
-    const now = new Date();
-    const istOffset = 5.5 * 60 * 60 * 1000; // IST is UTC+5:30
-    const istTime = new Date(now.getTime() + istOffset);
-    const currentYear = istTime.getUTCFullYear();
-    const currentMonth = istTime.getUTCMonth() + 1;
+    const { year: currentYear, month: currentMonth } = getIstNow();
 
     // Determine start date dynamically from payments (Logic from profile.php)
     let startYear = currentYear;
@@ -59,7 +54,6 @@ export function calculateUserFinancials(user: User, payments: Payment[]): UserFi
 
     const history: MonthStatus[] = [];
     let paidMonthsCount = 0;
-    let dueMonthsCount = 0; // This is calculated dynamically, distinct from user.bakaya_month
 
     // Loop from start date to current date (profile.php line 66)
     for (let year = startYear; year <= currentYear; year++) {
@@ -80,7 +74,10 @@ export function calculateUserFinancials(user: User, payments: Payment[]): UserFi
                     month,
                     monthName,
                     amount: paidAmount!,
-                    status: 'paid'
+                    status: 'paid',
+                    // A month counts as cleared as soon as anything is paid against it
+                    // (unchanged behaviour), but flag short payments so the UI can show them.
+                    isPartial: paidAmount! < monthlyAmount
                 });
             } else {
                 // Only count as due if user is Regular (profile.php logic implies this check for display)
@@ -112,67 +109,102 @@ export function calculateUserFinancials(user: User, payments: Payment[]): UserFi
         totalPaid,
         paidMonthsCount,
         dueMonthsCount: calculatedDueMonthsCount, // Use dynamic calculation
-        minDueAmount: calculatedDueMonthsCount * 125, // Calculate amount based on dynamic count
+        minDueAmount: calculatedDueMonthsCount * monthlyAmount, // Honour the user's own monthly rate
         avgMonthlyPayment: paidMonthsCount > 0 ? totalPaid / paidMonthsCount : 0,
         history: history.reverse() // Newest first
     };
+}
+
+export interface PaymentAllocation {
+    year: number;
+    month: number;
+    monthName: string;
+    amount: number;
+}
+
+/**
+ * Current date in IST, regardless of where this runs (Node server or the
+ * admin's browser). Previously the client used the browser's local timezone
+ * while the server forced IST, so around a month boundary the two could
+ * disagree about which month is "current".
+ */
+export function getIstNow(): { year: number; month: number } {
+    const istOffset = 5.5 * 60 * 60 * 1000; // IST is UTC+5:30
+    const istTime = new Date(Date.now() + istOffset);
+    return { year: istTime.getUTCFullYear(), month: istTime.getUTCMonth() + 1 };
+}
+
+function monthNameOf(year: number, month: number) {
+    return new Date(year, month - 1).toLocaleString('default', { month: 'long' });
 }
 
 /**
  * Smart Allocation Logic (FIFO)
  * Determines which months should be marked as paid given a bulk amount.
  * Distributes amount equally among clearable months.
+ *
+ * Single source of truth: the admin form (client) and processSmartPayment
+ * (server) both call this, so they can never disagree about the current month
+ * or about how an amount gets split.
  */
 export function allocatePayment(
     amount: number,
     history: MonthStatus[],
-    monthlyRate: number = 125
-): { year: number; month: number; amount: number }[] {
+    monthlyRate: number = 125,
+    frequency: string = 'Regular'
+): PaymentAllocation[] {
 
-    const allocations: { year: number; month: number; amount: number }[] = [];
-    // Force IST timezone
-    const now = new Date();
-    const istOffset = 5.5 * 60 * 60 * 1000;
-    const istTime = new Date(now.getTime() + istOffset);
-    const currentYear = istTime.getUTCFullYear();
-    const currentMonth = istTime.getUTCMonth() + 1;
+    const allocations: PaymentAllocation[] = [];
 
-    // Filter for due months and sort by Oldest First (FIFO)
-    const dueMonths = [...history]
-        .filter(h => h.status === 'due')
-        .sort((a, b) => (a.year - b.year) || (a.month - b.month));
+    // Guard: nothing is allocatable for a missing, zero or negative amount.
+    // Without this, a 0 / negative entry created a payment row anyway and still
+    // decremented the user's due count.
+    if (!Number.isFinite(amount) || amount <= 0) return allocations;
+
+    const { year: currentYear, month: currentMonth } = getIstNow();
+
+    // "One Time" payers have no monthly schedule, so nothing is ever "due" for
+    // them - the whole amount lands on the current month.
+    const dueMonths = frequency === 'One Time'
+        ? []
+        : [...history]
+            .filter(h => h.status === 'due')
+            .sort((a, b) => (a.year - b.year) || (a.month - b.month));
+
+    // Minimum needed to clear a month; the current month gets the lower rate.
+    const currentMonthRate = Math.min(100, monthlyRate);
+    const minFor = (m: { year: number; month: number }) =>
+        (m.year === currentYear && m.month === currentMonth) ? currentMonthRate : monthlyRate;
 
     // If no due months, allocate to current month
     if (dueMonths.length === 0) {
         allocations.push({
             year: currentYear,
             month: currentMonth,
-            amount: amount
+            monthName: monthNameOf(currentYear, currentMonth),
+            amount
         });
         return allocations;
     }
 
-    const hasCurrentMonth = dueMonths.some(d => d.year === currentYear && d.month === currentMonth);
-    
-    // Special case: exactly 100 and current month is due
-    if (amount === 100 && hasCurrentMonth) {
-        const current = dueMonths.find(d => d.year === currentYear && d.month === currentMonth);
-        if (current) {
-            allocations.push({
-                year: current.year,
-                month: current.month,
-                amount: 100
-            });
-        }
+    const current = dueMonths.find(d => d.year === currentYear && d.month === currentMonth);
+
+    // Special case: exactly the current-month rate, and current month is due
+    if (amount === currentMonthRate && current) {
+        allocations.push({
+            year: current.year,
+            month: current.month,
+            monthName: current.monthName,
+            amount
+        });
         return allocations;
     }
 
     // Calculate how many months can be cleared with minimum amounts
     let remaining = amount;
     let clearableMonths = 0;
-    for (let i = 0; i < dueMonths.length; i++) {
-        const isCurrent = dueMonths[i].year === currentYear && dueMonths[i].month === currentMonth;
-        const min = isCurrent ? 100 : 125;
+    for (const due of dueMonths) {
+        const min = minFor(due);
         if (remaining >= min) {
             remaining -= min;
             clearableMonths++;
@@ -185,28 +217,24 @@ export function allocatePayment(
     if (clearableMonths > 0) {
         const perMonth = Math.floor(amount / clearableMonths);
         const remainder = amount % clearableMonths;
-        
+
         for (let i = 0; i < clearableMonths; i++) {
-            const allocAmount = perMonth + (i < remainder ? 1 : 0);
             allocations.push({
                 year: dueMonths[i].year,
                 month: dueMonths[i].month,
-                amount: allocAmount
+                monthName: dueMonths[i].monthName,
+                amount: perMonth + (i < remainder ? 1 : 0)
             });
         }
     } else {
         // Amount is not enough to clear any month - allocate to current month if due, else oldest
-        const targetMonth = hasCurrentMonth 
-            ? dueMonths.find(d => d.year === currentYear && d.month === currentMonth)
-            : dueMonths[0];
-        
-        if (targetMonth) {
-            allocations.push({
-                year: targetMonth.year,
-                month: targetMonth.month,
-                amount: amount
-            });
-        }
+        const targetMonth = current ?? dueMonths[0];
+        allocations.push({
+            year: targetMonth.year,
+            month: targetMonth.month,
+            monthName: targetMonth.monthName,
+            amount
+        });
     }
 
     return allocations;
@@ -224,12 +252,7 @@ export function calculateBakayaStatus(
 ): number {
     if (frequency !== 'Regular') return 0;
 
-    // Force IST timezone
-    const now = new Date();
-    const istOffset = 5.5 * 60 * 60 * 1000;
-    const istTime = new Date(now.getTime() + istOffset);
-    const currentYear = istTime.getUTCFullYear();
-    const currentMonth = istTime.getUTCMonth() + 1;
+    const { year: currentYear, month: currentMonth } = getIstNow();
 
     // Default start date (from PHP logic)
     // If first_payment is not set, we might assume they just started or handle it gracefully.

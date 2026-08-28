@@ -56,12 +56,22 @@ export function PaymentTimeline({ history, payments, frequency }: PaymentTimelin
                     <div className="flex flex-col items-end gap-1">
                         {item.status === 'paid' ? (
                             <>
-                                <span
-                                    className="font-bold text-base"
-                                    style={{ color: '#0D483B' }}
-                                >
-                                    ₹{item.amount}
-                                </span>
+                                <div className="flex items-center gap-2">
+                                    <span
+                                        className="font-bold text-base"
+                                        style={{ color: '#0D483B' }}
+                                    >
+                                        ₹{item.amount}
+                                    </span>
+                                    {item.isPartial && (
+                                        <span
+                                            className="font-bold text-[10px] px-2 py-0.5 rounded-[12px]"
+                                            style={{ background: '#fff3cd', color: '#8a6100' }}
+                                        >
+                                            PARTIAL
+                                        </span>
+                                    )}
+                                </div>
                                 {(() => {
                                     const monthPayments = getPaymentsForMonth(item.year, item.month);
                                     return monthPayments.length > 1 ? (
