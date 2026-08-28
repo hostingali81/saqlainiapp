@@ -124,10 +124,7 @@ export function calculateUserFinancials(user: User, payments: Payment[]): UserFi
                     month,
                     monthName,
                     amount: paidAmount!,
-                    status: 'paid',
-                    // A month counts as cleared as soon as anything is paid against it
-                    // (unchanged behaviour), but flag short payments so the UI can show them.
-                    isPartial: paidAmount! < monthlyAmount
+                    status: 'paid'
                 });
             } else if (memberAccruesDues && !isBeforeTrackingStart(year, month)) {
                 history.push({
