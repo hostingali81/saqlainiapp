@@ -10,7 +10,7 @@ Modern Islamic community management system with Arabic aesthetics.
 - Google Sheets integration
 - Admin panel with authentication
 - Responsive design with glassmorphism UI
-- PWA support
+- Installable on mobile (web app manifest + icons; no offline service worker)
 
 ## 📋 Prerequisites
 

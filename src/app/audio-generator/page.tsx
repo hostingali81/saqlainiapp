@@ -26,6 +26,7 @@ export default function AudioGeneratorPage() {
     // Audio
     const [generatingAudio, setGeneratingAudio] = useState(false);
     const [audioUrl, setAudioUrl] = useState<string | null>(null);
+    const [audioError, setAudioError] = useState('');
 
     // Utils
     const [copied, setCopied] = useState(false);
@@ -100,6 +101,7 @@ export default function AudioGeneratorPage() {
         if (!scriptResult?.script) return;
         setGeneratingAudio(true);
         setAudioUrl(null);
+        setAudioError('');
 
         try {
             const response = await fetch('/api/generate-audio', {
@@ -108,14 +110,18 @@ export default function AudioGeneratorPage() {
                 body: JSON.stringify({ textToConvert: scriptResult.script })
             });
 
-            if (!response.ok) throw new Error('Failed to generate audio');
+            if (!response.ok) {
+                // The API now returns a reason (unauthorised, text too long, ...).
+                const detail = await response.json().catch(() => null);
+                throw new Error(detail?.error || 'Failed to generate audio');
+            }
 
             const blob = await response.blob();
             const url = URL.createObjectURL(blob);
             setAudioUrl(url);
-        } catch (error) {
+        } catch (error: any) {
             console.error(error);
-            alert('Error generating audio');
+            setAudioError(error?.message || 'Could not generate the audio. Please try again.');
         } finally {
             setGeneratingAudio(false);
         }
@@ -131,6 +137,12 @@ export default function AudioGeneratorPage() {
             </p>
 
             {/* ERROR CARD (Mock) */}
+            {audioError && (
+                <div className="mb-4 px-4 py-3 rounded-[10px] text-sm" style={{ background: '#fdecea', border: '1px solid #f5c2c0', color: '#a33a35' }}>
+                    {audioError}
+                </div>
+            )}
+
             {scriptResult?.error && (
                 <div className="bg-red-100 border border-red-200 text-red-700 p-4 rounded mb-6">
                     {scriptResult.error}

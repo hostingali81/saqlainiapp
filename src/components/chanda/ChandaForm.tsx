@@ -12,8 +12,6 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip";
-import pdfMake from 'pdfmake/build/pdfmake';
-import pdfFonts from 'pdfmake/build/vfs_fonts';
 
 export function ChandaForm() {
     const [groups, setGroups] = useState<ChandaGroup[]>([]);
@@ -21,6 +19,7 @@ export function ChandaForm() {
     const [search, setSearch] = useState('');
     const [loading, setLoading] = useState(true);
     const [isExporting, setIsExporting] = useState(false);
+    const [exportError, setExportError] = useState('');
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -40,9 +39,32 @@ export function ChandaForm() {
     const exportToPDF = async () => {
         if (!confirm("Are you sure you want to download the PDF?")) return;
 
+        setExportError('');
+
+        setIsExporting(true);
+
+        // pdfmake is a very large dependency and is only needed when someone
+        // actually downloads a PDF. Loading it on demand keeps it out of the
+        // initial page bundle.
+        let pdfMake: any;
+        let pdfFonts: any;
         try {
-            setIsExporting(true);
+            const [pdfMakeMod, pdfFontsMod] = await Promise.all([
+                import('pdfmake/build/pdfmake'),
+                import('pdfmake/build/vfs_fonts'),
+            ]);
+            pdfMake = pdfMakeMod.default;
+            pdfFonts = pdfFontsMod.default;
+        } catch (loadError) {
+            console.error('Failed to load the PDF library', loadError);
+            setExportError('Could not load the PDF library. Check your connection and try again.');
+            setIsExporting(false);
+            return;
+        }
+
+        try {
             console.log('Starting PDF export with Hindi font support...');
+
 
             // Load fonts
             const fontURL = '/fonts/NotoSansDevanagari-Regular.ttf';
@@ -256,7 +278,7 @@ export function ChandaForm() {
                     }
                 };
 
-                alert('Could not load Hindi fonts. Downloading version with default fonts (Hindi text may be broken).');
+                setExportError('Could not load Hindi fonts. Downloading a version with default fonts - Hindi text may not render correctly.');
                 (pdfMake as any).createPdf(fallbackDocDef).download(
                     `Chanda_Records_Fallback_${new Date().toISOString().split('T')[0]}.pdf`,
                     () => setIsExporting(false) // Callback
@@ -264,7 +286,7 @@ export function ChandaForm() {
 
             } catch (fallbackError) {
                 console.error('Even fallback failed', fallbackError);
-                alert('Failed to generate PDF. Please check console.');
+                setExportError('Failed to generate the PDF. Please try again.');
                 setIsExporting(false);
             }
         }
@@ -272,6 +294,11 @@ export function ChandaForm() {
 
     return (
         <main className="max-w-[800px] mx-auto p-6 pb-24">
+            {exportError && (
+                <div className="mb-4 px-4 py-3 rounded-[10px] text-sm" style={{ background: '#fdecea', border: '1px solid #f5c2c0', color: '#a33a35' }}>
+                    {exportError}
+                </div>
+            )}
             {/* Title & Export Button */}
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-bold" style={{ color: '#0D483B' }}>Chanda Records</h1>

@@ -26,11 +26,14 @@ export async function middleware(request: NextRequest) {
 
     const { data: { user } } = await supabase.auth.getUser();
 
-    // Protect admin routes
-    if (pathname.startsWith('/admin') && pathname !== '/admin/login') {
-        if (!user) {
-            return NextResponse.redirect(new URL('/admin/login', request.url));
-        }
+    // Protect admin routes. /audio-generator lives outside /admin but exposes
+    // the same member data, so it is gated here too.
+    const isProtected =
+        (pathname.startsWith('/admin') && pathname !== '/admin/login') ||
+        pathname.startsWith('/audio-generator');
+
+    if (isProtected && !user) {
+        return NextResponse.redirect(new URL('/admin/login', request.url));
     }
 
     // Redirect to admin if already logged in
@@ -42,5 +45,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-    matcher: ['/admin/:path*']
+    matcher: ['/admin/:path*', '/audio-generator/:path*']
 };

@@ -1,4 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
+import { fetchAllRows } from '@/lib/fetch-all';
+import { MONTHLY_RATE } from '@/lib/logic';
 import { Coins, Wallet, Smartphone, HandCoins, FileText, ArrowUpCircle, TrendingUp, Calendar, Mic } from 'lucide-react';
 import { formatIndianCurrency } from '@/lib/utils';
 import Link from 'next/link';
@@ -9,54 +11,41 @@ import { MonthlyHistorySkeleton } from '@/components/skeletons/MonthlyHistorySke
 async function MonthlyHistoryContent() {
     const supabase = await createClient();
 
-    // Use aggregation for totals and fetch detailed data separately
-    const paymentTotal = await supabase.from('payment').select('amount');
-    const chandaTotal = await supabase.from('db_chanda').select('amount');
-    const expensesAll = await supabase.from('expenses').select('amount, head');
-    const bakayaAll = await supabase.from('user_list').select('bakaya_month');
-    const monthlyAll = await supabase.from('payment').select('year, month, amount, user_id, id');
+    // This page is public, but the audio generator is admin-only now. Hide the
+    // link from visitors instead of bouncing them to a login screen.
+    const { data: { user: adminUser } } = await supabase.auth.getUser();
 
-    // Fetch all records using multiple queries if needed
-    let allPayments = paymentTotal.data || [];
-    let allMonthly = monthlyAll.data || [];
-    let allExpenses = expensesAll.data || [];
-    
-    // If we got exactly 1000, fetch more
-    if (allPayments.length === 1000) {
-        let offset = 1000;
-        while (true) {
-            const { data } = await supabase.from('payment').select('amount').range(offset, offset + 999);
-            if (!data || data.length === 0) break;
-            allPayments = [...allPayments, ...data];
-            offset += 1000;
-            if (data.length < 1000) break;
-        }
-    }
-    
-    if (allMonthly.length === 1000) {
-        let offset = 1000;
-        while (true) {
-            const { data } = await supabase.from('payment').select('year, month, amount, user_id, id').range(offset, offset + 999);
-            if (!data || data.length === 0) break;
-            allMonthly = [...allMonthly, ...data];
-            offset += 1000;
-            if (data.length < 1000) break;
-        }
-    }
-    
-    if (allExpenses.length === 1000) {
-        let offset = 1000;
-        while (true) {
-            const { data } = await supabase.from('expenses').select('amount, head').range(offset, offset + 999);
-            if (!data || data.length === 0) break;
-            allExpenses = [...allExpenses, ...data];
-            offset += 1000;
-            if (data.length < 1000) break;
-        }
+    // Every one of these must be paged: Supabase stops at 1000 rows, and
+    // `db_chanda` / `user_list` used to be read with a plain select, so their
+    // totals silently went short once those tables grew past 1000 rows.
+    // `payment` is fetched once with every column the page needs, rather than
+    // twice (the old `amount`-only query was a subset of this one).
+    const [monthlyResult, chandaResult, expensesResult, bakayaResult] = await Promise.all([
+        fetchAllRows<{ year: number; month: number; amount: number; user_id: number; id: number }>(
+            () => supabase.from('payment').select('year, month, amount, user_id, id')
+        ),
+        fetchAllRows<{ amount: number }>(() => supabase.from('db_chanda').select('amount')),
+        fetchAllRows<{ amount: number; head: string | null }>(() => supabase.from('expenses').select('amount, head')),
+        fetchAllRows<{ bakaya_month: number; amount: number | null }>(
+            () => supabase.from('user_list').select('bakaya_month, amount')
+        ),
+    ]);
+
+    const loadError = monthlyResult.error || chandaResult.error || expensesResult.error || bakayaResult.error;
+    if (loadError) {
+        console.error('Error loading monthly history:', loadError);
+        return (
+            <div className="p-6 text-center text-red-600">
+                Failed to load the totals. Please refresh and try again.
+            </div>
+        );
     }
 
-    const totalPayment = allPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-    const totalChanda = chandaTotal.data?.reduce((sum, c) => sum + (Number(c.amount) || 0), 0) || 0;
+    const allMonthly = monthlyResult.rows;
+    const allExpenses = expensesResult.rows;
+
+    const totalPayment = allMonthly.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+    const totalChanda = chandaResult.rows.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
 
     // Split expenses by head
     const expensesSaqlaini = allExpenses.filter(e => e.head === 'SaqlainiApp' || e.head === null || e.head === '').reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
@@ -71,9 +60,13 @@ async function MonthlyHistoryContent() {
     const grandTotalCollection = totalPayment + totalChanda;
     const totalAvailableBalance = availableSaqlaini + availableChanda;
 
-    // 5. Get total due amount
-    const totalDueMonths = bakayaAll.data?.reduce((sum, u) => sum + (Number(u.bakaya_month) || 0), 0) || 0;
-    const totalBakayaAmount = totalDueMonths * 125;
+    // 5. Get total due amount. Each member's own monthly rate is used rather
+    // than a flat 125, so members on a different rate are not misreported.
+    const totalDueMonths = bakayaResult.rows.reduce((sum, u) => sum + (Number(u.bakaya_month) || 0), 0);
+    const totalBakayaAmount = bakayaResult.rows.reduce(
+        (sum, u) => sum + (Number(u.bakaya_month) || 0) * (Number(u.amount) || MONTHLY_RATE),
+        0
+    );
 
     // 6. Get monthly breakdown
     const monthlyBreakdown = allMonthly.reduce((acc: any[], payment) => {
@@ -208,7 +201,8 @@ async function MonthlyHistoryContent() {
                 </div>
             </div>
 
-            {/* Audio Generator Link - Moved here */}
+            {/* Audio Generator Link - admin only */}
+            {adminUser && (
             <div className="flex justify-center mb-8">
                 <Link href="/audio-generator">
                     <Button
@@ -224,6 +218,7 @@ async function MonthlyHistoryContent() {
                     </Button>
                 </Link>
             </div>
+            )}
 
             {/* MONTHLY BREAKDOWN LIST - PHP Style */}
             <div

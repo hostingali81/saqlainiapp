@@ -6,18 +6,22 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { cn, getPhotoUrl } from '@/lib/utils';
+import { applyAvatarFallback, getAvatarFallbackUrl, getPhotoUrl } from '@/lib/utils';
 import { ImageModal } from './ImageModal';
 
 interface UserCardProps {
     user: User;
     style?: React.CSSProperties;
+    /** Position in the rendered list; the first few load eagerly. */
+    index?: number;
 }
 
-export function UserCard({ user, style }: UserCardProps) {
+export function UserCard({ user, style, index = 0 }: UserCardProps) {
     const isDue = user.bakaya_month > 0;
     const [isModalOpen, setIsModalOpen] = useState(false);
-    const isPriority = user.id <= 10;
+    // Was `user.id <= 10`, which eager-loaded whichever members happened to have
+    // low ids rather than the ones actually on screen first.
+    const isPriority = index < 8;
 
     const handleImageClick = (e: React.MouseEvent) => {
         e.preventDefault();
@@ -25,13 +29,21 @@ export function UserCard({ user, style }: UserCardProps) {
         setIsModalOpen(true);
     };
 
-    const largeImageUrl = user.hasImage
-        ? getPhotoUrl(user.id, 'large')
-        : `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&bold=true&color=0D483B&size=300`;
+    // `hasImage` is hard-coded true wherever users are loaded, so this branch
+    // never picked the fallback. The modal now falls back on load failure
+    // instead, which is what actually tells us whether a photo exists.
+    const largeImageUrl = getPhotoUrl(user.id, 'large')
+        || getAvatarFallbackUrl(user.name, 300);
 
     return (
         <>
-            <div style={style} className="p-2">
+            {/* content-visibility lets the browser skip layout and paint for cards
+                that are scrolled out of view - the cheap alternative to
+                virtualising a long member list. */}
+            <div
+                style={{ ...style, contentVisibility: 'auto', containIntrinsicSize: '82px' }}
+                className="p-2"
+            >
                 <Link href={`/profile/${user.id}`} prefetch={true}>
                     {/* GLASSMORPHISM CARD */}
                     <div className="glass-card rounded-[15px] p-4 flex items-center gap-3 relative overflow-hidden">
@@ -49,9 +61,7 @@ export function UserCard({ user, style }: UserCardProps) {
                                 alt={user.name}
                                 className="h-[50px] w-[50px] rounded-full object-cover glass-avatar"
                                 loading={isPriority ? 'eager' : 'lazy'}
-                                onError={(e) => {
-                                    e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&bold=true&color=0D483B&size=50`;
-                                }}
+                                onError={(e) => applyAvatarFallback(e.currentTarget, user.name, 50)}
                             />
                         </div>
 

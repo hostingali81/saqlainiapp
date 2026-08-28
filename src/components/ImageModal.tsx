@@ -1,8 +1,9 @@
 'use client';
 
 import { X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Button } from './ui/button';
+import { applyAvatarFallback } from '@/lib/utils';
 
 interface ImageModalProps {
     isOpen: boolean;
@@ -14,6 +15,7 @@ interface ImageModalProps {
 export function ImageModal({ isOpen, onClose, imageUrl, userName }: ImageModalProps) {
     const [isLoading, setIsLoading] = useState(true);
     const [hasError, setHasError] = useState(false);
+    const imgRef = useRef<HTMLImageElement>(null);
 
     useEffect(() => {
         if (!isOpen) {
@@ -21,6 +23,15 @@ export function ImageModal({ isOpen, onClose, imageUrl, userName }: ImageModalPr
             setHasError(false);
         }
     }, [isOpen]);
+
+    // A cached image can finish decoding before React attaches onLoad, in which
+    // case the event never fires and the skeleton spins forever. Check the
+    // element's own state once it is mounted.
+    useEffect(() => {
+        if (!isOpen) return;
+        const img = imgRef.current;
+        if (img?.complete && img.naturalWidth > 0) setIsLoading(false);
+    }, [isOpen, imageUrl]);
 
     useEffect(() => {
         const handleEscape = (e: KeyboardEvent) => {
@@ -100,6 +111,7 @@ export function ImageModal({ isOpen, onClose, imageUrl, userName }: ImageModalPr
 
                     {/* Actual Image with golden border */}
                     <img
+                        ref={imgRef}
                         src={imageUrl}
                         alt={userName}
                         className={`w-full h-auto object-contain max-h-[85vh] rounded-lg transition-opacity duration-300 ${isLoading ? 'hidden' : 'block'}`}
@@ -108,9 +120,17 @@ export function ImageModal({ isOpen, onClose, imageUrl, userName }: ImageModalPr
                             boxShadow: '0 0 30px rgba(198, 168, 105, 0.5)'
                         }}
                         onLoad={() => setIsLoading(false)}
-                        onError={() => {
-                            setHasError(true);
-                            setIsLoading(false);
+                        onError={(e) => {
+                            // Members without an uploaded photo used to land on the
+                            // "Failed to load image" state. Show the same initials
+                            // avatar the rest of the app falls back to, and only
+                            // surface the error if that fails too.
+                            if (e.currentTarget.dataset.avatarFallbackApplied === 'true') {
+                                setHasError(true);
+                                setIsLoading(false);
+                                return;
+                            }
+                            applyAvatarFallback(e.currentTarget, userName, 300);
                         }}
                     />
 

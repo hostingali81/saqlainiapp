@@ -33,7 +33,8 @@ export function LoginForm() {
                 router.push('/admin');
                 router.refresh();
             } else {
-                setError('Incorrect username or password');
+                // The API distinguishes bad credentials from "too many attempts".
+                setError(data.error || 'Incorrect username or password');
             }
         } catch (err) {
             setError('Login failed');

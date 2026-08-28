@@ -1,5 +1,68 @@
 import { User, Payment, MonthStatus, UserFinancialSummary } from '@/types';
 
+/** Default monthly contribution when a member has no rate of their own. */
+export const MONTHLY_RATE = 125;
+
+/**
+ * Collection tracking began in December 2021 (carried over from the PHP
+ * cronjob). Gaps before this date are history, not dues.
+ */
+export const TRACKING_START_YEAR = 2021;
+export const TRACKING_START_MONTH = 12;
+
+export function isBeforeTrackingStart(year: number, month: number): boolean {
+    return year < TRACKING_START_YEAR
+        || (year === TRACKING_START_YEAR && month < TRACKING_START_MONTH);
+}
+
+/**
+ * Only "Regular" members build up monthly dues.
+ *
+ * calculateBakayaStatus has always used `frequency !== 'Regular'`, but the
+ * profile page only special-cased the exact string 'One Time'. A member whose
+ * frequency was blank or anything else therefore had 0 dues stored on their
+ * card and a full list of due months on their profile.
+ */
+export function accruesDues(frequency: string | null | undefined): boolean {
+    return frequency === 'Regular';
+}
+
+/**
+ * Distinct paid months **inside the tracking window**.
+ *
+ * `calculateBakayaStatus` counts expected months from the tracking start, so
+ * feeding it payments from before that date subtracted months it never counted
+ * in the first place and under-reported the dues.
+ */
+export function countTrackedPaidMonths(payments: Array<{ year: number; month: number }>): number {
+    const months = new Set<string>();
+    for (const p of payments) {
+        if (isBeforeTrackingStart(p.year, p.month)) continue;
+        months.add(`${p.year}-${p.month}`);
+    }
+    return months.size;
+}
+
+/**
+ * Earliest month a member ever paid for - the anchor every due calculation
+ * starts from. `undefined` when they have no payments at all, in which case
+ * there is nothing to measure dues against.
+ *
+ * Callers used to open with `minYear = 9999` and pass that sentinel straight
+ * through, which silently skipped calculateBakayaStatus's own fallback.
+ */
+export function findFirstPaymentMonth(
+    payments: Array<{ year: number; month: number }>
+): { year: number; month: number } | undefined {
+    let first: { year: number; month: number } | undefined;
+    for (const p of payments) {
+        if (!first || p.year < first.year || (p.year === first.year && p.month < first.month)) {
+            first = { year: p.year, month: p.month };
+        }
+    }
+    return first;
+}
+
 /**
  * Ported logic from profile.php (Lines 54-91)
  * Calculates the payment history and due status for a user.
@@ -8,32 +71,10 @@ export function calculateUserFinancials(user: User, payments: Payment[]): UserFi
     const { year: currentYear, month: currentMonth } = getIstNow();
 
     // Determine start date dynamically from payments (Logic from profile.php)
-    let startYear = currentYear;
-    let startMonth = 1;
+    const firstPayment = findFirstPaymentMonth(payments);
 
-    if (payments.length > 0) {
-        let minYear = 9999;
-        let minMonth = 12;
-
-        payments.forEach(p => {
-            if (p.year < minYear) {
-                minYear = p.year;
-                minMonth = p.month;
-            } else if (p.year === minYear) {
-                if (p.month < minMonth) {
-                    minMonth = p.month;
-                }
-            }
-        });
-        startYear = minYear;
-        startMonth = minMonth;
-    } else {
-        // Default to current year if no payments (profile.php behavior)
-        startYear = currentYear;
-        startMonth = 1;
-    }
-
-    const monthlyAmount = user.amount || 125; // Default to 125 if not set
+    const monthlyAmount = user.amount || MONTHLY_RATE;
+    const memberAccruesDues = accruesDues(user.frequency);
 
     // Create a map for quick lookup: "YYYY-MM" -> amount
     const paymentMap = new Map<string, number>();
@@ -55,7 +96,16 @@ export function calculateUserFinancials(user: User, payments: Payment[]): UserFi
     const history: MonthStatus[] = [];
     let paidMonthsCount = 0;
 
-    // Loop from start date to current date (profile.php line 66)
+    // Loop from the first payment to the current date (profile.php line 66).
+    // With no payments there is no anchor to measure dues from, so the timeline
+    // stays empty and the due count is 0 - which is what calculateBakayaStatus
+    // (and therefore the member card) reports for the same member. Previously
+    // this started at January of the current year and billed every month since,
+    // so a member who had never paid showed 0 dues on their card and several on
+    // their profile.
+    const startYear = firstPayment ? firstPayment.year : currentYear + 1;
+    const startMonth = firstPayment ? firstPayment.month : 1;
+
     for (let year = startYear; year <= currentYear; year++) {
         const monthStart = (year === startYear) ? startMonth : 1;
         const monthEnd = (year === currentYear) ? currentMonth : 12;
@@ -79,13 +129,7 @@ export function calculateUserFinancials(user: User, payments: Payment[]): UserFi
                     // (unchanged behaviour), but flag short payments so the UI can show them.
                     isPartial: paidAmount! < monthlyAmount
                 });
-            } else {
-                // Only count as due if user is Regular (profile.php logic implies this check for display)
-                // But for calculation we track all gaps.
-                // profile.php line 87: if (!isset($payments[$key])) { $total_due += $monthly_amount; }
-                // Wait, profile.php calculates $total_due but then uses $user['bakaya_month'] for the stat card.
-                // We will calculate the *actual* gaps here.
-
+            } else if (memberAccruesDues && !isBeforeTrackingStart(year, month)) {
                 history.push({
                     year,
                     month,
@@ -94,6 +138,11 @@ export function calculateUserFinancials(user: User, payments: Payment[]): UserFi
                     status: 'due'
                 });
             }
+            // Unpaid months from before collection tracking began are skipped
+            // entirely. They used to be listed as DUE here while `bakaya_month`
+            // (which starts counting at the cutoff) ignored them, so the profile
+            // page and the member card showed two different numbers.
+            // Paid months before the cutoff are still shown, so no history is lost.
         }
     }
 
@@ -102,8 +151,8 @@ export function calculateUserFinancials(user: User, payments: Payment[]): UserFi
     // This makes the UI "smart" and independent of potentially stale DB 'bakaya_month' values.
     const calculatedDueMonthsCount = history.filter(h => h.status === 'due').length;
 
-    // For "Not Regular" / "One Time", due count is effectively 0 for display, 
-    // but the function returns the raw calculated gaps. The UI handles the 0 override.
+    // Non-Regular members never get due rows above, so this is already 0 for
+    // them - the UI no longer has to override anything.
 
     return {
         totalPaid,
@@ -138,6 +187,56 @@ function monthNameOf(year: number, month: number) {
     return new Date(year, month - 1).toLocaleString('default', { month: 'long' });
 }
 
+/** Where the admin decided an ambiguous payment should go. */
+export type AllocationChoice = 'oldest' | 'currentMonth';
+
+/**
+ * True when the destination of a payment is genuinely ambiguous and the admin
+ * must decide, rather than the system picking silently:
+ *
+ *   - the current month has already been paid something, and
+ *   - an older month is still due, and
+ *   - the amount is worth recording but cannot clear a full older month
+ *     (>= the current-month rate, < the monthly rate).
+ *
+ * In that window the money could sensibly either top up the current month or
+ * go against the old due month, so the form asks instead of guessing.
+ */
+export function needsAllocationChoice(
+    amount: number,
+    history: MonthStatus[],
+    monthlyRate: number = MONTHLY_RATE,
+    frequency: string = 'Regular'
+): boolean {
+    if (!accruesDues(frequency)) return false;
+    if (!Number.isFinite(amount) || amount <= 0) return false;
+
+    const currentMonthRate = Math.min(100, monthlyRate);
+    if (amount < currentMonthRate || amount >= monthlyRate) return false;
+
+    const { year, month } = getIstNow();
+
+    const current = history.find(h => h.year === year && h.month === month);
+    if (!current || current.status !== 'paid') return false;
+
+    return history.some(h =>
+        h.status === 'due' && (h.year < year || (h.year === year && h.month < month))
+    );
+}
+
+/** The current month's entry, used to show what has already been paid against it. */
+export function findCurrentMonth(history: MonthStatus[]): MonthStatus | undefined {
+    const { year, month } = getIstNow();
+    return history.find(h => h.year === year && h.month === month);
+}
+
+/** Oldest still-due month - the default destination when the admin picks "oldest". */
+export function findOldestDueMonth(history: MonthStatus[]): MonthStatus | undefined {
+    return [...history]
+        .filter(h => h.status === 'due')
+        .sort((a, b) => (a.year - b.year) || (a.month - b.month))[0];
+}
+
 /**
  * Smart Allocation Logic (FIFO)
  * Determines which months should be marked as paid given a bulk amount.
@@ -150,8 +249,9 @@ function monthNameOf(year: number, month: number) {
 export function allocatePayment(
     amount: number,
     history: MonthStatus[],
-    monthlyRate: number = 125,
-    frequency: string = 'Regular'
+    monthlyRate: number = MONTHLY_RATE,
+    frequency: string = 'Regular',
+    choice?: AllocationChoice
 ): PaymentAllocation[] {
 
     const allocations: PaymentAllocation[] = [];
@@ -163,9 +263,22 @@ export function allocatePayment(
 
     const { year: currentYear, month: currentMonth } = getIstNow();
 
-    // "One Time" payers have no monthly schedule, so nothing is ever "due" for
-    // them - the whole amount lands on the current month.
-    const dueMonths = frequency === 'One Time'
+    // The admin deliberately sent this payment to the current month (see
+    // needsAllocationChoice). The whole amount goes there, even though the
+    // month may already be paid - that is what makes it a top-up.
+    if (choice === 'currentMonth') {
+        allocations.push({
+            year: currentYear,
+            month: currentMonth,
+            monthName: monthNameOf(currentYear, currentMonth),
+            amount
+        });
+        return allocations;
+    }
+
+    // Members who do not accrue dues (One Time, or no frequency set) have no
+    // monthly schedule - the whole amount lands on the current month.
+    const dueMonths = !accruesDues(frequency)
         ? []
         : [...history]
             .filter(h => h.status === 'due')
@@ -250,24 +363,22 @@ export function calculateBakayaStatus(
     totalPaidMonths: number,
     frequency: string = 'Regular'
 ): number {
-    if (frequency !== 'Regular') return 0;
+    if (!accruesDues(frequency)) return 0;
+
+    // No first payment means no anchor to measure dues from. Callers used to
+    // pass a 9999 sentinel here, which produced a negative month count that
+    // happened to clamp to 0 - correct by accident. Say it explicitly.
+    if (!firstPaymentYear || !firstPaymentMonth) return 0;
 
     const { year: currentYear, month: currentMonth } = getIstNow();
 
-    // Default start date (from PHP logic)
-    // If first_payment is not set, we might assume they just started or handle it gracefully.
-    // PHP Logic: $start_year = $user['first_payment_year'] ?: date('Y');
-    let startYear = firstPaymentYear || currentYear;
-    let startMonth = firstPaymentMonth || 1;
+    let startYear = firstPaymentYear;
+    let startMonth = firstPaymentMonth;
 
     // PHP Logic: Filter out months before Dec 2021
-    // $start_period = new DateTime('2021-12-01');
-    const cutoffYear = 2021;
-    const cutoffMonth = 12;
-
-    if (startYear < cutoffYear || (startYear === cutoffYear && startMonth < cutoffMonth)) {
-        startYear = cutoffYear;
-        startMonth = cutoffMonth;
+    if (isBeforeTrackingStart(startYear, startMonth)) {
+        startYear = TRACKING_START_YEAR;
+        startMonth = TRACKING_START_MONTH;
     }
 
     // Calculate total expected months

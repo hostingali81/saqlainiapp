@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Camera, Trash2 } from 'lucide-react';
 import { PhotoUploadModal } from '@/components/PhotoUploadModal';
-import { getPhotoUrl } from '@/lib/utils';
+import { applyAvatarFallback, getPhotoUrl } from '@/lib/utils';
 
 interface PhotoManagementProps {
     users: User[];
@@ -18,6 +18,7 @@ export function PhotoManagement({ users }: PhotoManagementProps) {
     const [photoModalOpen, setPhotoModalOpen] = useState(false);
     const [imageKey, setImageKey] = useState(0);
     const [successMessage, setSuccessMessage] = useState('');
+    const [errorMessage, setErrorMessage] = useState('');
 
     const selectedUser = users.find(u => u.id.toString() === selectedUserId);
 
@@ -25,17 +26,21 @@ export function PhotoManagement({ users }: PhotoManagementProps) {
     const userOptions = users.map(u => ({
         value: u.id.toString(),
         label: `${u.name} - ${u.fname}`,
-        image: `${getPhotoUrl(u.id, 'small')}?v=${Date.now()}`
+        // imageKey already existed for exactly this; Date.now() here changed the
+        // URL on every render and re-downloaded every avatar.
+        image: `${getPhotoUrl(u.id, 'small')}?v=${imageKey}`
     }));
 
     const currentImageUrl = selectedUser
-        ? `${getPhotoUrl(selectedUser.id, 'large')}?v=${Date.now()}`
+        ? `${getPhotoUrl(selectedUser.id, 'large')}?v=${imageKey}`
         : '';
 
     const handleDelete = async () => {
         if (!selectedUser) return;
 
         if (!confirm('Are you sure you want to delete this photo?')) return;
+
+        setErrorMessage('');
 
         try {
             const response = await fetch('/api/admin/delete-photo', {
@@ -51,11 +56,11 @@ export function PhotoManagement({ users }: PhotoManagementProps) {
                 setSuccessMessage('Photo deleted successfully!');
                 setTimeout(() => setSuccessMessage(''), 3000);
             } else {
-                alert('Failed to delete photo');
+                setErrorMessage(data.error || 'Failed to delete photo.');
             }
         } catch (error) {
             console.error('Delete error:', error);
-            alert('Error deleting photo');
+            setErrorMessage('Could not reach the server. Please try again.');
         }
     };
 
@@ -69,6 +74,12 @@ export function PhotoManagement({ users }: PhotoManagementProps) {
                     {successMessage && (
                         <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative">
                             {successMessage}
+                        </div>
+                    )}
+
+                    {errorMessage && (
+                        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
+                            {errorMessage}
                         </div>
                     )}
 
@@ -96,7 +107,7 @@ export function PhotoManagement({ users }: PhotoManagementProps) {
                                         className="w-40 h-40 rounded-full object-cover border-4 border-gray-200"
                                         loading="eager"
                                         onError={(e) => {
-                                            e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedUser.name)}&bold=true&color=0D483B&size=300`;
+                                            applyAvatarFallback(e.currentTarget, selectedUser.name, 300);
                                         }}
                                     />
                                 </div>

@@ -9,7 +9,14 @@ import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { processSmartPayment, getUserProfile, createNewUserPayment } from '@/app/actions/user';
-import { allocatePayment, PaymentAllocation } from '@/lib/logic';
+import {
+    allocatePayment,
+    needsAllocationChoice,
+    findCurrentMonth,
+    findOldestDueMonth,
+    PaymentAllocation,
+    AllocationChoice
+} from '@/lib/logic';
 import { Check, UserPlus } from 'lucide-react';
 import { getPhotoUrl } from '@/lib/utils';
 
@@ -31,7 +38,10 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
     const [showNewEntryForm, setShowNewEntryForm] = useState(false);
     const [loading, setLoading] = useState(false);
     const [result, setResult] = useState<{ success?: boolean; allocated?: any[]; error?: string; warning?: string } | null>(null);
-    const [dueMonths, setDueMonths] = useState<MonthStatus[]>([]);
+    // Full history, not just the due months: deciding whether the destination is
+    // ambiguous needs to know what the current month has already been paid.
+    const [history, setHistory] = useState<MonthStatus[]>([]);
+    const [allocationChoice, setAllocationChoice] = useState<AllocationChoice | null>(null);
     const [loadingMonths, setLoadingMonths] = useState(false);
     const [reloadKey, setReloadKey] = useState(0);
     const amountInputRef = useRef<HTMLInputElement>(null);
@@ -58,12 +68,13 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
         setRemarks({});
         setCustomAmounts({});
         setGlobalRemark('');
+        setAllocationChoice(null);
         setShowRemarkDialog(false);
     }, []);
 
     useEffect(() => {
         if (!selectedUserId) {
-            setDueMonths([]);
+            setHistory([]);
             return;
         }
 
@@ -72,12 +83,7 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
 
         getUserProfile(parseInt(selectedUserId)).then(res => {
             if (cancelled) return;
-            if ('error' in res) {
-                setDueMonths([]);
-            } else {
-                const dueOnly = res.financials?.history.filter(h => h.status === 'due') || [];
-                setDueMonths(dueOnly.sort((a, b) => (a.year - b.year) || (a.month - b.month)));
-            }
+            setHistory('error' in res ? [] : (res.financials?.history || []));
             setLoadingMonths(false);
         });
 
@@ -112,6 +118,30 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
     const amountNum = Number(amount);
     const amountValid = amount.trim() !== '' && Number.isInteger(amountNum) && amountNum > 0;
 
+    const dueMonths = useMemo(
+        () => history
+            .filter(h => h.status === 'due')
+            .sort((a, b) => (a.year - b.year) || (a.month - b.month)),
+        [history]
+    );
+
+    const currentMonthEntry = useMemo(() => findCurrentMonth(history), [history]);
+    const oldestDueMonth = useMemo(() => findOldestDueMonth(history), [history]);
+
+    /**
+     * The current month is already paid, an older month is still due, and the
+     * amount cannot clear that older month outright. Either destination is
+     * defensible, so the admin picks rather than the system guessing.
+     */
+    const needsChoice = useMemo(() => (
+        !!selectedUser && amountValid
+        && needsAllocationChoice(amountNum, history, MONTHLY_RATE, selectedUser.frequency)
+    ), [selectedUser, amountValid, amountNum, history]);
+
+    // Only honour a choice while it is actually being asked for, so a leftover
+    // value can never quietly redirect an unrelated payment.
+    const effectiveChoice = needsChoice ? (allocationChoice ?? undefined) : undefined;
+
     /**
      * Derived, never stored. The old code snapshotted the allocation when the
      * remarks dialog opened and then reused that snapshot at submit time, so
@@ -119,8 +149,10 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
      */
     const allocations: PaymentAllocation[] = useMemo(() => {
         if (!selectedUser || !amountValid) return [];
-        return allocatePayment(amountNum, dueMonths, MONTHLY_RATE, selectedUser.frequency);
-    }, [selectedUser, amountValid, amountNum, dueMonths]);
+        // Nothing is allocated until the admin answers the question.
+        if (needsChoice && !allocationChoice) return [];
+        return allocatePayment(amountNum, history, MONTHLY_RATE, selectedUser.frequency, effectiveChoice);
+    }, [selectedUser, amountValid, amountNum, history, needsChoice, allocationChoice, effectiveChoice]);
 
     const amountFor = useCallback(
         (a: PaymentAllocation) => customAmounts[monthKeyOf(a)] ?? a.amount,
@@ -130,6 +162,13 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
     const allocatedTotal = useMemo(
         () => allocations.reduce((sum, a) => sum + amountFor(a), 0),
         [allocations, amountFor]
+    );
+
+    // Allocated months that are not in the due list - i.e. a top-up onto an
+    // already-paid month, which the due-month chips cannot show.
+    const outsideDueAllocations = useMemo(
+        () => allocations.filter(a => !dueMonths.some(m => m.year === a.year && m.month === a.month)),
+        [allocations, dueMonths]
     );
 
     // Overrides can be edited freely, so check them the same way the server does.
@@ -159,7 +198,8 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
                 parseInt(selectedUserId),
                 amountNum,
                 remarks,
-                finalAllocations
+                finalAllocations,
+                effectiveChoice
             );
             setResult(res);
 
@@ -392,6 +432,22 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
                                         );
                                     })}
                                 </div>
+
+                                {/* A top-up lands on a month that is already paid, so it has no
+                                    chip above. Show it here or the money would go somewhere the
+                                    admin cannot see. */}
+                                {outsideDueAllocations.length > 0 && (
+                                    <div className="mt-2 pt-2 border-t border-red-200">
+                                        <p className="text-xs font-semibold text-green-800 mb-1">This payment goes to:</p>
+                                        <div className="flex flex-wrap gap-2">
+                                            {outsideDueAllocations.map(a => (
+                                                <span key={monthKeyOf(a)} className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700">
+                                                    {a.monthName} {a.year} - ₹{amountFor(a)} (top-up)
+                                                </span>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         ) : allocations.length > 0 ? (
                             <div className="bg-green-50 border border-green-200 rounded-md p-3">
@@ -416,6 +472,9 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
                                     // Per-month overrides were worked out for the previous
                                     // amount, so they must not survive a change to it.
                                     setCustomAmounts({});
+                                    // Same for the destination: a new amount is a fresh
+                                    // decision, so the admin picks again.
+                                    setAllocationChoice(null);
                                 }}
                                 onKeyDown={(e) => {
                                     // `loading` was missing here, so a double Enter fired
@@ -442,6 +501,61 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
                             {amountValid && allocations.length > 0 && allocationAmountsValid && !totalsMatch && (
                                 <p className="text-xs text-red-600">
                                     Month-wise total is ₹{allocatedTotal} but the paid amount is ₹{amountNum}. Fix the amounts under Remarks.
+                                </p>
+                            )}
+                        </div>
+                    )}
+
+                    {!showNewEntryForm && needsChoice && (
+                        <div className="rounded-md border border-amber-300 bg-amber-50 p-3 space-y-2">
+                            <p className="text-sm font-semibold text-amber-900">Where should this payment go?</p>
+                            <p className="text-xs text-amber-800">
+                                {currentMonthEntry?.monthName} {currentMonthEntry?.year} already has ₹{currentMonthEntry?.amount} paid,
+                                and {oldestDueMonth?.monthName} {oldestDueMonth?.year} is still due.
+                                ₹{amountNum} is not enough to clear {oldestDueMonth?.monthName} in full, so please choose.
+                            </p>
+
+                            <div className="space-y-1">
+                                <label className="flex items-start gap-2 p-2 rounded cursor-pointer hover:bg-amber-100">
+                                    <input
+                                        type="radio"
+                                        name="allocationChoice"
+                                        className="mt-1"
+                                        checked={allocationChoice === 'oldest'}
+                                        onChange={() => setAllocationChoice('oldest')}
+                                    />
+                                    <span className="text-sm">
+                                        <span className="font-medium">
+                                            Add to {oldestDueMonth?.monthName} {oldestDueMonth?.year}
+                                        </span>
+                                        <span className="block text-xs text-amber-800">
+                                            Oldest due month — goes in as a partial payment
+                                        </span>
+                                    </span>
+                                </label>
+
+                                <label className="flex items-start gap-2 p-2 rounded cursor-pointer hover:bg-amber-100">
+                                    <input
+                                        type="radio"
+                                        name="allocationChoice"
+                                        className="mt-1"
+                                        checked={allocationChoice === 'currentMonth'}
+                                        onChange={() => setAllocationChoice('currentMonth')}
+                                    />
+                                    <span className="text-sm">
+                                        <span className="font-medium">
+                                            Add to {currentMonthEntry?.monthName} {currentMonthEntry?.year}
+                                        </span>
+                                        <span className="block text-xs text-amber-800">
+                                            Top-up — this month&apos;s total becomes ₹{(currentMonthEntry?.amount ?? 0) + amountNum}
+                                        </span>
+                                    </span>
+                                </label>
+                            </div>
+
+                            {!allocationChoice && (
+                                <p className="text-xs font-medium text-red-600">
+                                    Choose one option to continue.
                                 </p>
                             )}
                         </div>

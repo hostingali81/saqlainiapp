@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Search, ChevronDown } from 'lucide-react';
+import { applyAvatarFallback } from '@/lib/utils';
 
 interface SearchableSelectProps {
     options: { value: string; label: string; image?: string }[];
@@ -116,7 +117,7 @@ export function SearchableSelect({ options, value, onChange, placeholder = "Sele
                                             className="w-8 h-8 rounded-full object-cover flex-shrink-0 bg-gray-200"
                                             onError={(e) => {
                                                 const name = option.label.split(' - ')[0] || 'User';
-                                                e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&bold=true&color=0D483B&size=32`;
+                                                applyAvatarFallback(e.currentTarget, name, 32);
                                             }}
                                         />
                                     )}

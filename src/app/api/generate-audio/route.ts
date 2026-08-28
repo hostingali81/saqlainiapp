@@ -1,13 +1,31 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { requireAdmin } from '@/lib/auth';
 
+// Azure bills per character, so an open endpoint is an open wallet.
+const MAX_TEXT_LENGTH = 8000;
 
 export async function POST(req: NextRequest) {
     try {
+        // This route spends money on the project's Azure account. It used to be
+        // completely unauthenticated - anyone who found the URL could use it as
+        // a free, unlimited text-to-speech service.
+        const auth = await requireAdmin();
+        if ('error' in auth) {
+            return NextResponse.json({ error: auth.error }, { status: 401 });
+        }
+
         const body = await req.json();
         const { textToConvert } = body;
 
-        if (!textToConvert) {
+        if (!textToConvert || typeof textToConvert !== 'string' || !textToConvert.trim()) {
             return NextResponse.json({ error: 'No text provided' }, { status: 400 });
+        }
+
+        if (textToConvert.length > MAX_TEXT_LENGTH) {
+            return NextResponse.json(
+                { error: `Text is too long (${textToConvert.length} characters, maximum ${MAX_TEXT_LENGTH}).` },
+                { status: 413 }
+            );
         }
 
         const region = process.env.AZURE_TTS_REGION;
@@ -37,7 +55,9 @@ export async function POST(req: NextRequest) {
         if (!response.ok) {
             const errorText = await response.text();
             console.error('Azure TTS Error:', response.status, errorText);
-            return NextResponse.json({ error: 'Azure TTS API failed', details: errorText }, { status: response.status });
+            // Do not echo Azure's response back to the browser; it can carry
+            // account and request details.
+            return NextResponse.json({ error: 'Azure TTS API failed' }, { status: response.status });
         }
 
         const audioBuffer = await response.arrayBuffer();
@@ -51,6 +71,6 @@ export async function POST(req: NextRequest) {
 
     } catch (error: any) {
         console.error('API Error:', error);
-        return NextResponse.json({ error: 'Internal Server Error', details: error.message }, { status: 500 });
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }

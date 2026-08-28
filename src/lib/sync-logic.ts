@@ -1,6 +1,6 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { getSheetData, mapRowsToObjects } from '@/lib/sheets';
-import { calculateBakayaStatus } from '@/lib/logic';
+import { calculateBakayaStatus, countTrackedPaidMonths, findFirstPaymentMonth } from '@/lib/logic';
 
 // --- CONFIGURATION ---
 const MAPPINGS: Record<string, Record<string, string>> = {
@@ -212,17 +212,20 @@ async function recalculateBakayaForAllUsers(supabase: any) {
             // Fetch Payment History
             const { data: payments } = await supabase.from('payment').select('year, month').eq('user_id', user.id);
 
-            const totalPaidMonths = new Set(payments?.map((p: any) => `${p.year}-${p.month}`)).size || 0;
+            // Same window as calculateBakayaStatus, otherwise pre-cutoff payments cancel
+            // out months that were never counted and dues come out too low.
+            const totalPaidMonths = countTrackedPaidMonths(payments || []);
 
             // Calculate Start Date
-            let minYear = 9999, minMonth = 12;
-            payments?.forEach((p: any) => {
-                if (p.year < minYear) { minYear = p.year; minMonth = p.month; }
-                else if (p.year === minYear && p.month < minMonth) { minMonth = p.month; }
-            });
+            const firstPayment = findFirstPaymentMonth(payments || []);
 
             // Calculate
-            const newBakaya = calculateBakayaStatus(minYear, minMonth, totalPaidMonths, user.frequency);
+            const newBakaya = calculateBakayaStatus(
+                firstPayment?.year,
+                firstPayment?.month,
+                totalPaidMonths,
+                user.frequency
+            );
 
             // Update
             await supabase.from('user_list').update({ bakaya_month: newBakaya }).eq('id', user.id);

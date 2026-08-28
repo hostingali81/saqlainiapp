@@ -7,8 +7,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Search, IndianRupee, Receipt, Tags, FileDown } from 'lucide-react';
 import { formatIndianCurrency } from '@/lib/utils';
-import pdfMake from 'pdfmake/build/pdfmake';
-import pdfFonts from 'pdfmake/build/vfs_fonts';
 
 export function ExpensesForm() {
     const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -20,13 +18,22 @@ export function ExpensesForm() {
     const [total, setTotal] = useState(0);
     const [loading, setLoading] = useState(true);
     const [isExporting, setIsExporting] = useState(false);
+    const [exportError, setExportError] = useState('');
 
     const exportToPDF = async () => {
         if (!confirm("Are you sure you want to download the Expense PDF?")) return;
 
+        setExportError('');
+
         try {
             setIsExporting(true);
             console.log('Starting PDF export with Hindi font support...');
+
+            // pdfmake is a very large dependency and is only needed when someone
+            // actually downloads a PDF. Importing it here keeps it out of the
+            // initial page bundle.
+            const { default: pdfMake } = await import('pdfmake/build/pdfmake');
+
 
             // Load fonts
             const fontURL = '/fonts/NotoSansDevanagari-Regular.ttf';
@@ -178,7 +185,7 @@ export function ExpensesForm() {
 
         } catch (error) {
             console.error('Error generating PDF:', error);
-            alert('Failed to generate PDF. Please check console.');
+            setExportError('Failed to generate the PDF. Please try again.');
             setIsExporting(false);
         }
     };
@@ -209,6 +216,11 @@ export function ExpensesForm() {
 
     return (
         <main className="max-w-[800px] mx-auto p-6 pb-24">
+            {exportError && (
+                <div className="mb-4 px-4 py-3 rounded-[10px] text-sm" style={{ background: '#fdecea', border: '1px solid #f5c2c0', color: '#a33a35' }}>
+                    {exportError}
+                </div>
+            )}
             {/* Title & Export Button */}
             <div className="flex justify-between items-center mb-6">
                 <h1 className="text-2xl font-bold" style={{ color: '#0D483B' }}>Expenses</h1>

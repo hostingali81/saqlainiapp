@@ -1,6 +1,7 @@
 'use server';
 
 import { createClient } from '@/lib/supabase/server';
+import { requireAdmin } from '@/lib/auth';
 
 const HINDI_NUMBERS: { [key: number]: string } = {
     0: 'शून्य', 1: 'एक', 2: 'दो', 3: 'तीन', 4: 'चार', 5: 'पांच', 6: 'छह', 7: 'सात', 8: 'आठ', 9: 'नौ', 10: 'दस',
@@ -26,6 +27,10 @@ export type AudioScriptResult = {
 };
 
 export async function generateAudioScript(months: number[]): Promise<AudioScriptResult> {
+    // This returns every member's name and outstanding months - not public data.
+    const auth = await requireAdmin();
+    if ('error' in auth) return { script: '', count: 0, error: auth.error };
+
     try {
         const supabase = await createClient();
 
@@ -68,6 +73,9 @@ export async function generateAudioScript(months: number[]): Promise<AudioScript
 }
 
 export async function getAvailableMonths(): Promise<{ month: number; count: number }[]> {
+    const auth = await requireAdmin();
+    if ('error' in auth) return [];
+
     const supabase = await createClient();
 
     // Note: Supabase doesn't support GROUP BY easily with simple SDK in one go for counts sometimes,

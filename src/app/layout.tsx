@@ -43,7 +43,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ar" dir="ltr">
+    <html lang="en" dir="ltr">
       <head>
         <link rel="preconnect" href="https://ui-avatars.com" />
         <link rel="dns-prefetch" href="https://ui-avatars.com" />

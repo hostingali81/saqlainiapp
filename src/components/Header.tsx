@@ -3,31 +3,44 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { formatIndianCurrency } from '@/lib/utils';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 
 export function Header() {
     const [totalAmount, setTotalAmount] = useState<number | null>(null);
+    const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
         const supabase = createClient();
-        
+        let cancelled = false;
+
         async function fetchTotal() {
             const { data } = await supabase.rpc('get_total_payment_amount');
-            setTotalAmount(data || 0);
+            if (!cancelled) setTotalAmount(data || 0);
         }
         fetchTotal();
-        
-        // Realtime subscription for payment changes
+
+        // A sync upserts hundreds of payment rows, and every one of them fired a
+        // fresh RPC here - for every connected client. Collapse a burst of
+        // changes into a single refetch.
+        function scheduleFetch() {
+            if (debounceRef.current) clearTimeout(debounceRef.current);
+            debounceRef.current = setTimeout(fetchTotal, 1500);
+        }
+
         const channel = supabase
             .channel('payment_changes')
-            .on('postgres_changes', 
+            .on('postgres_changes',
                 { event: '*', schema: 'public', table: 'payment' },
-                () => fetchTotal()
+                scheduleFetch
             )
             .subscribe();
 
-        return () => { supabase.removeChannel(channel); };
+        return () => {
+            cancelled = true;
+            if (debounceRef.current) clearTimeout(debounceRef.current);
+            supabase.removeChannel(channel);
+        };
     }, []);
 
     const formattedAmount = totalAmount !== null ? formatIndianCurrency(totalAmount) : null;

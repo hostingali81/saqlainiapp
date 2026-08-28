@@ -1,13 +1,16 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { User } from '@/types';
 import { Camera, Upload, Trash2, ZoomIn, ZoomOut, X } from 'lucide-react';
 import Cropper from 'react-easy-crop';
 import { getCroppedImg } from '@/lib/cropImage';
-import { getPhotoUrl } from '@/lib/utils';
+import { applyAvatarFallback, getPhotoUrl } from '@/lib/utils';
+
+const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 
 interface PhotoUploadModalProps {
     user: User | null;
@@ -23,6 +26,7 @@ export function PhotoUploadModal({ user, isOpen, onClose, onSuccess }: PhotoUplo
     const [zoom, setZoom] = useState(1);
     const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
     const [uploading, setUploading] = useState(false);
+    const [errorMessage, setErrorMessage] = useState('');
 
     useEffect(() => {
         return () => {
@@ -39,6 +43,19 @@ export function PhotoUploadModal({ user, isOpen, onClose, onSuccess }: PhotoUplo
     const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files.length > 0) {
             const file = e.target.files[0];
+
+            if (!ALLOWED_TYPES.includes(file.type)) {
+                setErrorMessage('Please choose a JPEG, PNG or WebP image.');
+                e.target.value = '';
+                return;
+            }
+            if (file.size > MAX_IMAGE_BYTES) {
+                setErrorMessage('That image is larger than 5MB. Please choose a smaller one.');
+                e.target.value = '';
+                return;
+            }
+
+            setErrorMessage('');
             setSelectedFile(file);
             setPreviewUrl(URL.createObjectURL(file));
             setZoom(1);
@@ -50,6 +67,7 @@ export function PhotoUploadModal({ user, isOpen, onClose, onSuccess }: PhotoUplo
         if (!selectedFile || !croppedAreaPixels || !user) return;
 
         setUploading(true);
+        setErrorMessage('');
 
         try {
             const largeBlob = await getCroppedImg(previewUrl, croppedAreaPixels, 300, 300);
@@ -75,12 +93,12 @@ export function PhotoUploadModal({ user, isOpen, onClose, onSuccess }: PhotoUplo
                 onSuccess();
                 handleClose();
             } else {
-                alert('Failed to upload photo');
+                setErrorMessage(data.error || 'Failed to upload photo.');
                 setUploading(false);
             }
         } catch (error) {
             console.error('Upload error:', error);
-            alert('Error uploading photo');
+            setErrorMessage('Could not reach the server. Please try again.');
             setUploading(false);
         }
     };
@@ -91,6 +109,7 @@ export function PhotoUploadModal({ user, isOpen, onClose, onSuccess }: PhotoUplo
         if (!confirm('Are you sure you want to delete this photo?')) return;
 
         setUploading(true);
+        setErrorMessage('');
 
         try {
             const response = await fetch('/api/admin/delete-photo', {
@@ -105,11 +124,11 @@ export function PhotoUploadModal({ user, isOpen, onClose, onSuccess }: PhotoUplo
                 onSuccess();
                 handleClose();
             } else {
-                alert('Failed to delete photo');
+                setErrorMessage(data.error || 'Failed to delete photo.');
             }
         } catch (error) {
             console.error('Delete error:', error);
-            alert('Error deleting photo');
+            setErrorMessage('Could not reach the server. Please try again.');
         } finally {
             setUploading(false);
         }
@@ -119,12 +138,19 @@ export function PhotoUploadModal({ user, isOpen, onClose, onSuccess }: PhotoUplo
         setSelectedFile(null);
         setPreviewUrl('');
         setUploading(false);
+        setErrorMessage('');
         onClose();
     };
 
-    if (!user) return null;
+    // One cache-busting value per time the dialog is opened for a user. Calling
+    // Date.now() during render changed the URL on every keystroke/re-render.
+    const currentImageUrl = useMemo(
+        () => (user ? `${getPhotoUrl(user.id, 'large')}?v=${Date.now()}` : ''),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [user?.id, isOpen]
+    );
 
-    const currentImageUrl = `${getPhotoUrl(user.id, 'large')}?v=${Date.now()}`;
+    if (!user) return null;
 
     return (
         <Dialog open={isOpen} onOpenChange={handleClose}>
@@ -142,6 +168,11 @@ export function PhotoUploadModal({ user, isOpen, onClose, onSuccess }: PhotoUplo
 
                 {/* Content */}
                 <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+                    {errorMessage && (
+                        <div className="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded text-sm">
+                            {errorMessage}
+                        </div>
+                    )}
                     {!selectedFile ? (
                         <div className="space-y-6">
                             {/* User Info */}
@@ -158,7 +189,7 @@ export function PhotoUploadModal({ user, isOpen, onClose, onSuccess }: PhotoUplo
                                         alt={user.name}
                                         className="w-56 h-56 sm:w-64 sm:h-64 rounded-full object-cover border-4 border-primary/20 shadow-lg"
                                         onError={(e) => {
-                                            e.currentTarget.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name)}&bold=true&color=0D483B&size=300`;
+                                            applyAvatarFallback(e.currentTarget, user.name, 300);
                                         }}
                                     />
                                 </div>

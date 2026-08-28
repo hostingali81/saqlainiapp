@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { Expense, ChandaEntry } from '@/types';
+import { fetchAllRows } from '@/lib/fetch-all';
 
 export async function getExpenses(page: number = 1, limit: number = 50, category?: string) {
     const supabase = await createClient();
@@ -100,23 +101,25 @@ export async function getChandaEntries(search: string = '') {
 async function getChandaEntriesLegacy(search: string = '') {
     const supabase = await createClient();
 
-    let query = supabase
-        .from('db_chanda')
-        .select('*')
-        .order('id', { ascending: false });
+    // Paged for the same reason: the totals below are summed over every row.
+    const { rows: rawData, error } = await fetchAllRows<any>(() => {
+        let query = supabase
+            .from('db_chanda')
+            .select('*')
+            .order('id', { ascending: false });
 
-    if (search) {
-        query = query.or(`name.ilike.%${search}%,hindi_name.ilike.%${search}%,remarks.ilike.%${search}%`);
-    }
-
-    const { data: rawData, error } = await query;
+        if (search) {
+            query = query.or(`name.ilike.%${search}%,hindi_name.ilike.%${search}%,remarks.ilike.%${search}%`);
+        }
+        return query;
+    });
 
     if (error) {
         console.error('Error fetching chanda entries:', error);
         return { groups: [], stats: { totalAmount: 0, totalDonations: 0, avgAmount: 0, maxAmount: 0 } };
     }
 
-    const entries = (rawData || []).map((item: any) => ({
+    const entries = rawData.map((item: any) => ({
         id: item.id,
         ChandaID: item.id,
         Name: item.name,
@@ -161,24 +164,26 @@ async function getChandaEntriesLegacy(search: string = '') {
     };
 }
 
-// ... existing codes ...
-
-// ... keep getCategories ...
-
 export async function getExpensePageStats(category?: string) {
     const supabase = await createClient();
 
-    let query = supabase.from('expenses').select('amount, category');
-    
-    if (category && category !== 'All') {
-        query = query.eq('category', category);
+    // A plain select stops at 1000 rows, so these headline numbers quietly
+    // went short once the expenses table grew past that.
+    const { rows: expenses, error } = await fetchAllRows<{ amount: number; category: string | null }>(() => {
+        let query = supabase.from('expenses').select('amount, category');
+        if (category && category !== 'All') {
+            query = query.eq('category', category);
+        }
+        return query;
+    });
+
+    if (error) {
+        console.error('Error fetching expense stats:', error);
     }
 
-    const { data: expenses } = await query;
-
-    const totalAmount = expenses?.reduce((sum, item) => sum + (item.amount || 0), 0) || 0;
-    const totalTransactions = expenses?.length || 0;
-    const totalCategories = new Set(expenses?.map(e => e.category).filter(Boolean)).size;
+    const totalAmount = expenses.reduce((sum, item) => sum + (item.amount || 0), 0);
+    const totalTransactions = expenses.length;
+    const totalCategories = new Set(expenses.map(e => e.category).filter(Boolean)).size;
 
     return { totalAmount, totalTransactions, totalCategories };
 }

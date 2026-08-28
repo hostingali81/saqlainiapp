@@ -1,12 +1,11 @@
 import { getUserProfile } from '@/app/actions/user';
 import { PaymentTimeline } from '@/components/PaymentTimeline';
 import { WhatsAppButton } from '@/components/WhatsAppButton';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft, Phone, User as UserIcon } from 'lucide-react';
+import { ArrowLeft, Phone } from 'lucide-react';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { formatIndianCurrency, getPhotoUrl } from '@/lib/utils';
+import { formatIndianCurrency } from '@/lib/utils';
+import { MONTHLY_RATE } from '@/lib/logic';
 import { Suspense } from 'react';
 import { ProfileSkeleton } from '@/components/skeletons/ProfileSkeleton';
 import { ProfileImage } from '@/components/ProfileImage';
@@ -30,11 +29,19 @@ async function ProfileContent({ id }: { id: string }) {
     const { user, financials, payments } = result;
     if (!user || !financials) notFound();
 
-    // Check if image exists
-    const hasImage = user.hasImage;
-
     return (
         <main className="max-w-[800px] mx-auto p-6 pb-24">
+
+            {/* Back to the member list - there was no way back except the
+                browser button. */}
+            <Link
+                href="/"
+                className="inline-flex items-center gap-2 mb-4 text-sm font-medium transition-colors hover:opacity-80"
+                style={{ color: '#165E4B' }}
+            >
+                <ArrowLeft className="h-4 w-4" />
+                Back to members
+            </Link>
 
             {/* PROFILE HEADER - Exact PHP match + subtle glass */}
             <div className="glass-card rounded-[15px] p-6 mb-6 text-center relative">
@@ -73,10 +80,10 @@ async function ProfileContent({ id }: { id: string }) {
                     ) : null}
                     <WhatsAppButton user={user} financials={financials} />
                 </div>
-            </div >
+            </div>
 
             {/* STATS CONTAINER - PHP grid exact */}
-            < div
+            <div
                 className="grid gap-4 mb-6"
                 style={{
                     gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))'
@@ -102,12 +109,12 @@ async function ProfileContent({ id }: { id: string }) {
                     </div>
                     <div style={{ color: '#4A3728', fontSize: '0.9rem' }}>Due Months</div>
                 </div>
-            </div >
+            </div>
 
             {/* PAYMENT SUMMARY - PHP Style with Summary Boxes */}
-            < div className="glass-card rounded-[15px] p-6 mb-6" >
+            <div className="glass-card rounded-[15px] p-6 mb-6" >
                 {/* Title with bottom border */}
-                < h3
+                <h3
                     className="text-xl font-bold mb-4 pb-2"
                     style={{
                         color: '#4A3728',
@@ -115,10 +122,10 @@ async function ProfileContent({ id }: { id: string }) {
                     }}
                 >
                     Payment Summary
-                </h3 >
+                </h3>
 
                 {/* Summary Boxes - PHP Style */}
-                < div
+                <div
                     className="rounded-[10px] p-4 mb-6 flex flex-wrap gap-4 justify-around"
                     style={{
                         background: 'rgba(229, 211, 170, 0.4)',
@@ -128,38 +135,38 @@ async function ProfileContent({ id }: { id: string }) {
                     }}
                 >
                     {/* Total Paid */}
-                    < div className="flex flex-col items-center" >
+                    <div className="flex flex-col items-center" >
                         <div className="text-sm" style={{ color: '#4A3728' }}>Total Paid</div>
                         <div className="text-xl font-bold" style={{ color: '#0D483B' }}>
                             ₹{formatIndianCurrency(financials.totalPaid)}
                         </div>
-                    </div >
+                    </div>
                     {/* Paid Months */}
-                    < div className="flex flex-col items-center" >
+                    <div className="flex flex-col items-center" >
                         <div className="text-sm" style={{ color: '#4A3728' }}>Paid Months</div>
                         <div className="text-xl font-bold" style={{ color: '#0D483B' }}>
                             {financials.paidMonthsCount}
                         </div>
-                    </div >
+                    </div>
                     {/* Due Amount */}
-                    < div className="flex flex-col items-center" >
+                    <div className="flex flex-col items-center" >
                         <div className="text-sm" style={{ color: '#4A3728' }}>Due Amount</div>
                         <div className="text-xl font-bold text-red-600">
-                            ₹{formatIndianCurrency(financials.dueMonthsCount * (user.amount || 125))}
+                            ₹{formatIndianCurrency(financials.dueMonthsCount * (user.amount || MONTHLY_RATE))}
                         </div>
-                    </div >
+                    </div>
                     {/* Average */}
-                    < div className="flex flex-col items-center" >
+                    <div className="flex flex-col items-center" >
                         <div className="text-sm" style={{ color: '#4A3728' }}>Avg Monthly</div>
                         <div className="text-xl font-bold" style={{ color: '#0D483B' }}>
                             ₹{formatIndianCurrency(Math.round(financials.avgMonthlyPayment))}
                         </div>
-                    </div >
-                </div >
-            </div >
+                    </div>
+                </div>
+            </div>
 
             {/* PAYMENT HISTORY List - PHP exact */}
-            < div className="glass-card rounded-[15px] p-6" >
+            <div className="glass-card rounded-[15px] p-6" >
                 <h3
                     className="text-xl font-bold mb-4"
                     style={{ color: '#4A3728' }}
@@ -172,8 +179,8 @@ async function ProfileContent({ id }: { id: string }) {
                     payments={payments || []}
                     frequency={user.frequency === 'One Time' ? 'Not Regular' : user.frequency}
                 />
-            </div >
-        </main >
+            </div>
+        </main>
     );
 }
 

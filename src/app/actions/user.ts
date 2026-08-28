@@ -3,11 +3,10 @@
 import { createClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/auth';
 import { User, Payment, PaymentActionResult, SimpleActionResult } from '@/types';
-import { calculateUserFinancials, allocatePayment, calculateBakayaStatus, getIstNow } from '@/lib/logic';
+import { calculateUserFinancials, allocatePayment, calculateBakayaStatus, getIstNow, needsAllocationChoice, countTrackedPaidMonths, findFirstPaymentMonth, MONTHLY_RATE, AllocationChoice } from '@/lib/logic';
 import { appendToSheet } from '@/lib/sheets';
 import { revalidatePath } from 'next/cache';
 
-const MONTHLY_RATE = 125;
 const pad = (n: number) => String(n).padStart(2, '0');
 
 /**
@@ -79,15 +78,18 @@ async function recalculateBakaya(supabase: any, userId: number, frequency: strin
         return `Payments were saved, but the due-month count could not be refreshed${error ? `: ${error.message}` : ''}.`;
     }
 
-    const distinctPaidMonths = new Set(payments.map((p: any) => `${p.year}-${p.month}`)).size;
+    // Only months inside the tracking window count here - calculateBakayaStatus
+    // measures expected months from the same cutoff.
+    const distinctPaidMonths = countTrackedPaidMonths(payments);
 
-    let minYear = 9999, minMonth = 12;
-    payments.forEach((p: any) => {
-        if (p.year < minYear) { minYear = p.year; minMonth = p.month; }
-        else if (p.year === minYear && p.month < minMonth) { minMonth = p.month; }
-    });
+    const firstPayment = findFirstPaymentMonth(payments);
 
-    const newBakaya = calculateBakayaStatus(minYear, minMonth, distinctPaidMonths, frequency);
+    const newBakaya = calculateBakayaStatus(
+        firstPayment?.year,
+        firstPayment?.month,
+        distinctPaidMonths,
+        frequency
+    );
 
     const { error: updateError } = await supabase
         .from('user_list')
@@ -104,7 +106,8 @@ export async function processSmartPayment(
     userId: number,
     amount: number,
     remarks: Record<string, string> = {},
-    customAllocations?: Array<{ year: number, month: number, monthName?: string, amount: number }>
+    customAllocations?: Array<{ year: number, month: number, monthName?: string, amount: number }>,
+    allocationChoice?: AllocationChoice
 ): Promise<PaymentActionResult> {
     const auth = await requireAdmin();
     if ('error' in auth) return { error: auth.error };
@@ -128,24 +131,38 @@ export async function processSmartPayment(
     const { user, financials } = result;
     if (!user || !financials) return { error: 'Invalid user data' };
 
-    // 2. Calculate Allocation
+    // 2. Ambiguous destination? The admin has to say where the money goes -
+    // enforced here too, not just in the form, so a stale or hand-made request
+    // cannot slip past the prompt.
+    const mustChoose = needsAllocationChoice(amount, financials.history, MONTHLY_RATE, user.frequency);
+    if (mustChoose && allocationChoice !== 'oldest' && allocationChoice !== 'currentMonth') {
+        return { error: 'This amount could top up the current month or go against an older due month. Please choose one and submit again.' };
+    }
+
+    // 3. Calculate Allocation
     let allocations: Array<{ year: number; month: number; monthName?: string; amount: number }>;
     if (customAllocations && customAllocations.length > 0) {
         allocations = customAllocations;
     } else {
-        allocations = allocatePayment(amount, financials.history, MONTHLY_RATE, user.frequency);
+        allocations = allocatePayment(amount, financials.history, MONTHLY_RATE, user.frequency, allocationChoice);
     }
 
     if (allocations.length === 0) {
         return { error: 'Unable to allocate payment.' };
     }
 
-    // 2b. Re-validate on the server. The client's allocation can be stale (or
+    // 4. Re-validate on the server. The client's allocation can be stale (or
     // tampered with), so never take it on trust.
     const { year: currentYear, month: currentMonth } = getIstNow();
     const paidKeys = new Set(
         financials.history.filter(h => h.status === 'paid').map(h => `${h.year}-${h.month}`)
     );
+    // The one month an already-paid allocation is allowed against: the current
+    // month, and only when the admin deliberately chose to top it up. A stale
+    // client never sets this, so the duplicate-payment guard still holds.
+    const topUpKey = (mustChoose && allocationChoice === 'currentMonth')
+        ? `${currentYear}-${currentMonth}`
+        : null;
     const seen = new Set<string>();
     let allocatedTotal = 0;
 
@@ -166,7 +183,7 @@ export async function processSmartPayment(
         }
         seen.add(key);
 
-        if (paidKeys.has(key)) {
+        if (paidKeys.has(key) && key !== topUpKey) {
             return { error: `${a.monthName || key} is already paid. Please reload the form and try again.` };
         }
 
@@ -177,7 +194,7 @@ export async function processSmartPayment(
         return { error: `Allocated total (Rs ${allocatedTotal}) does not match the paid amount (Rs ${amount}).` };
     }
 
-    // 3. Insert Payments.
+    // 5. Insert Payments.
     // `id` is assigned here rather than by the database, so two admins saving at
     // the same moment can pick the same id. Retry on a unique violation.
     // The durable fix is an identity/sequence default on payment.id.
@@ -223,12 +240,12 @@ export async function processSmartPayment(
         return { error: `Failed to record payments: ${insertError.message}` };
     }
 
-    // 4. Recalculate the user's due months from the real data
+    // 6. Recalculate the user's due months from the real data
     const warnings: string[] = [];
     const bakayaWarning = await recalculateBakaya(supabase, userId, user.frequency);
     if (bakayaWarning) warnings.push(bakayaWarning);
 
-    // 5. Add to Google Sheet - Individual entries for each allocated month
+    // 7. Add to Google Sheet - Individual entries for each allocated month
     try {
         const { timestamp, date: paymentDate } = istStamp();
 

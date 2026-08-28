@@ -35,8 +35,8 @@ export function AdminNav() {
                     </Button>
                 </Link>
             )}
-            {pathname !== '/admin/admin/sync' && (
-                <Link href="/admin/admin/sync">
+            {pathname !== '/admin/sync' && (
+                <Link href="/admin/sync">
                     <Button variant="outline" size="sm">
                         <RefreshCw className="h-4 w-4 mr-2" />
                         Sync

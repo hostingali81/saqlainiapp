@@ -1,6 +1,7 @@
 'use client';
 
 import { User, UserFinancialSummary } from '@/types';
+import { MONTHLY_RATE } from '@/lib/logic';
 
 interface WhatsAppButtonProps {
     user: User;
@@ -10,7 +11,7 @@ interface WhatsAppButtonProps {
 export function WhatsAppButton({ user, financials }: WhatsAppButtonProps) {
     if (!user.phone) return null;
 
-    const dueAmount = financials.dueMonthsCount * (user.amount || 125);
+    const dueAmount = financials.dueMonthsCount * (user.amount || MONTHLY_RATE);
     const avgPayment = financials.paidMonthsCount > 0 ? (financials.totalPaid / financials.paidMonthsCount).toFixed(2) : '0.00';
 
     // Exact Hindi Message from Legacy profile.php
@@ -30,9 +31,12 @@ export function WhatsAppButton({ user, financials }: WhatsAppButtonProps) {
 
     message += `\n\n*सादर,* ${String.fromCodePoint(0x1F54C)}\n*सकलैनी मस्जिद केसरपुर*`;
 
-    // Phone number logic: strip non-digits, ensure it starts with 91
+    // Phone number logic: strip non-digits, ensure it carries the country code.
+    // Testing startsWith('91') broke every 10-digit number that happens to begin
+    // with 91 (e.g. 9123456789) - those were sent without a country code.
+    // A local Indian number is 10 digits; anything longer already has one.
     let cleanPhone = user.phone.replace(/\D/g, '');
-    if (!cleanPhone.startsWith('91')) {
+    if (cleanPhone.length === 10) {
         cleanPhone = '91' + cleanPhone;
     }
 
@@ -43,6 +47,7 @@ export function WhatsAppButton({ user, financials }: WhatsAppButtonProps) {
         <a
             href={url}
             target="_blank"
+            rel="noopener noreferrer"
             className="inline-flex items-center justify-center rounded-[25px] px-6 py-3 font-medium transition-all min-w-[140px] cursor-pointer hover:-translate-y-0.5 hover:shadow-[0_4px_15px_rgba(37,211,102,0.3)]"
             style={{
                 background: 'linear-gradient(135deg, #25D366, #128C7E)',
