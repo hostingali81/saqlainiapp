@@ -1,18 +1,25 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getExpenses, getExpensePageStats, getCategories } from '@/app/actions/finance';
+import { getExpenses, getAllExpenses, getExpensePageStats, getCategories } from '@/app/actions/finance';
 import { Expense } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Search, IndianRupee, Receipt, Tags, FileDown } from 'lucide-react';
 import { formatIndianCurrency } from '@/lib/utils';
+import { formatDMY, istToday } from '@/lib/dates';
+
+// DD-MM-YYYY (IST) for file names - a "/" cannot appear in one.
+const fileDate = () => formatDMY(istToday()).replace(/\//g, '-');
 
 export function ExpensesForm() {
     const [expenses, setExpenses] = useState<Expense[]>([]);
     const [stats, setStats] = useState<{ totalAmount: number; totalTransactions: number; totalCategories: number } | null>(null);
     const [categories, setCategories] = useState<string[]>(['All']);
     const [search, setSearch] = useState('');
+    // What the server is actually filtered by - `search` settled for a moment,
+    // so every keystroke does not fire a request.
+    const [appliedSearch, setAppliedSearch] = useState('');
     const [category, setCategory] = useState('All');
     const [page, setPage] = useState(1);
     const [total, setTotal] = useState(0);
@@ -81,9 +88,14 @@ export function ExpensesForm() {
                 }
             };
 
-            // Fetch ALL records for export (respecting current category filter)
+            // Fetch ALL records for export (same category + search as the list).
+            // getAllExpenses pages through the table - a single request stops
+            // at 1000 rows.
             console.log(`Fetching all records for export...`);
-            const allDataResponse = await getExpenses(1, 10000, category);
+            const allDataResponse = await getAllExpenses(category, appliedSearch);
+            if (allDataResponse.error) {
+                throw new Error(allDataResponse.error);
+            }
             const allExpenses = allDataResponse.data;
 
             const docDefinition: any = {
@@ -102,7 +114,7 @@ export function ExpensesForm() {
                         margin: [0, 0, 0, 5]
                     },
                     {
-                        text: `Generated: ${new Date().toLocaleDateString('en-GB')}`,
+                        text: `Generated: ${formatDMY(istToday())}`,
                         fontSize: 10,
                         color: '#666666',
                         alignment: 'center',
@@ -179,7 +191,7 @@ export function ExpensesForm() {
 
             // CRITICAL: Pass VFS and fonts directly to createPdf
             (pdfMake as any).createPdf(docDefinition, null, customFonts, vfs).download(
-                `Expense_Records_${new Date().toISOString().split('T')[0]}.pdf`,
+                `Expense_Records_${fileDate()}.pdf`,
                 () => setIsExporting(false) // Callback when done
             );
 
@@ -190,21 +202,34 @@ export function ExpensesForm() {
         }
     };
 
+    // Settle the search box, then start again from page 1 of the new results.
     useEffect(() => {
+        const timer = setTimeout(() => {
+            setAppliedSearch(search.trim());
+            setPage(1);
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [search]);
+
+    useEffect(() => {
+        // A slower, older response must not overwrite a newer one.
+        let cancelled = false;
         const fetchData = async () => {
             setLoading(true);
             setStats(null);
             const [expenseResponse, statsData] = await Promise.all([
-                getExpenses(page, 50, category),
-                getExpensePageStats(category)
+                getExpenses(page, 50, category, appliedSearch),
+                getExpensePageStats(category, appliedSearch)
             ]);
+            if (cancelled) return;
             setExpenses(expenseResponse.data);
             setTotal(expenseResponse.total);
             setStats(statsData);
             setLoading(false);
         };
         fetchData();
-    }, [page, category]);
+        return () => { cancelled = true; };
+    }, [page, category, appliedSearch]);
 
     useEffect(() => {
         const init = async () => {
@@ -396,7 +421,6 @@ export function ExpensesForm() {
                 ) : (
                     <div>
                         {expenses
-                            .filter(e => e.Details?.toLowerCase().includes(search.toLowerCase()))
                             .map((expense, idx, arr) => (
                                 <div
                                     key={expense.id}
@@ -456,7 +480,7 @@ export function ExpensesForm() {
                         Previous
                     </Button>
                     <span className="text-sm font-medium" style={{ color: '#165E4B' }}>
-                        Page {page} of {Math.ceil(total / 50)}
+                        Page {page} of {Math.max(1, Math.ceil(total / 50))}
                     </span>
                     <Button
                         variant="outline"

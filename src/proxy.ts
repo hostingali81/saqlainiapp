@@ -1,8 +1,10 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { isAdminUser } from '@/lib/admin-access';
 
-export async function middleware(request: NextRequest) {
+// Next 16 renamed `middleware` to `proxy`; the behaviour is unchanged.
+export async function proxy(request: NextRequest) {
     const pathname = request.nextUrl.pathname;
     let response = NextResponse.next();
 
@@ -25,6 +27,8 @@ export async function middleware(request: NextRequest) {
     );
 
     const { data: { user } } = await supabase.auth.getUser();
+    // Signed in is not the same as admin - see admin-access.ts.
+    const isAdmin = isAdminUser(user);
 
     // Protect admin routes. /audio-generator lives outside /admin but exposes
     // the same member data, so it is gated here too.
@@ -32,12 +36,13 @@ export async function middleware(request: NextRequest) {
         (pathname.startsWith('/admin') && pathname !== '/admin/login') ||
         pathname.startsWith('/audio-generator');
 
-    if (isProtected && !user) {
+    if (isProtected && !isAdmin) {
         return NextResponse.redirect(new URL('/admin/login', request.url));
     }
 
-    // Redirect to admin if already logged in
-    if (pathname === '/admin/login' && user) {
+    // Redirect to admin if already logged in. Only for admins: a signed-in
+    // non-admin would otherwise bounce between /admin and /admin/login forever.
+    if (pathname === '/admin/login' && isAdmin) {
         return NextResponse.redirect(new URL('/admin', request.url));
     }
 

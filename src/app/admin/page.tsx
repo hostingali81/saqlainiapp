@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
-import { SmartEntryForm } from '@/components/SmartEntryForm';
-import { PaymentEntriesTable } from '@/components/PaymentEntriesTable';
+import { isAdminUser } from '@/lib/admin-access';
+import { fetchAllRows } from '@/lib/fetch-all';
 import { User } from '@/types';
 import { redirect } from 'next/navigation';
 import { AdminPageClient } from '@/components/admin/AdminPageClient';
@@ -12,20 +12,22 @@ export default async function AdminPage() {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
-    if (!user) {
+    if (!isAdminUser(user)) {
         redirect('/admin/login');
     }
 
-    const { data: users, error } = await supabase
+    // Paged: a plain select stops at 1000 rows and would silently drop members.
+    const { rows: users, error } = await fetchAllRows<User>(() => supabase
         .from('user_list')
         .select('*')
-        .order('name', { ascending: true });
+        .order('name', { ascending: true })
+        .order('id', { ascending: true }));
 
     if (error) {
         return <div>Error loading users.</div>;
     }
 
-    const usersWithImages = (users as User[]).map(user => ({
+    const usersWithImages = users.map(user => ({
         ...user,
         hasImage: true
     }));

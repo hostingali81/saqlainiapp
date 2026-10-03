@@ -7,22 +7,39 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { getPaymentEntries, updatePaymentEntry, deletePaymentEntry } from '@/app/actions/payments';
 import { PaymentEntryRow } from '@/types';
 import { Pencil, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { formatDMY, formatMonthYY } from '@/lib/dates';
 
-/** MM/DD/YYYY from the sheet -> DD/MM/YYYY, without rendering "Invalid Date". */
+/** Entry dates arrive as ISO (see getPaymentEntries) -> DD/MM/YYYY. */
 function formatDate(value: string) {
-    if (!value) return '-';
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return value;
-    return parsed.toLocaleDateString('en-GB');
+    return value ? formatDMY(value) : '-';
 }
 
-export function PaymentEntriesTable({ refreshTrigger }: { refreshTrigger?: number }) {
+/** What the server re-checks before touching a row (see verifySheetRow). */
+function rowGuard(entry: PaymentEntryRow) {
+    return {
+        timestamp: entry.timestamp,
+        name: entry.name,
+        amount: entry.amount,
+        month: entry.month,
+        year: entry.year
+    };
+}
+
+export function PaymentEntriesTable({ refreshTrigger, onDataChanged }: {
+    refreshTrigger?: number;
+    /** Edits and deletes re-sync the database, so the page's member data changes too. */
+    onDataChanged?: () => void;
+}) {
     const [entries, setEntries] = useState<PaymentEntryRow[]>([]);
     const [total, setTotal] = useState(0);
     const [page, setPage] = useState(1);
     const [perPage] = useState(10);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [warning, setWarning] = useState<string | null>(null);
+    // A delete now also re-syncs the app and takes a few seconds; block a
+    // second click on the same (already shifting) list meanwhile.
+    const [deletingRow, setDeletingRow] = useState<number | null>(null);
     const [editEntry, setEditEntry] = useState<PaymentEntryRow | null>(null);
     const [editData, setEditData] = useState<any>({});
     const [editError, setEditError] = useState<string | null>(null);
@@ -70,33 +87,35 @@ export function PaymentEntriesTable({ refreshTrigger }: { refreshTrigger?: numbe
         setEditError(null);
 
         // The original values identify the row; `editData` may have been changed.
-        const result = await updatePaymentEntry(editEntry.rowIndex, editData, {
-            timestamp: editEntry.timestamp,
-            name: editEntry.name
-        });
+        const result = await updatePaymentEntry(editEntry.rowIndex, editData, rowGuard(editEntry));
 
         setSaving(false);
 
         if (result.success) {
             setShowEditDialog(false);
             setEditEntry(null);
+            setWarning(result.warning || null);
             loadEntries();
+            onDataChanged?.();
         } else {
             setEditError(result.error || 'Could not save the entry.');
         }
     };
 
     const handleDelete = async (entry: PaymentEntryRow) => {
+        if (deletingRow !== null) return;
         if (!confirm(`Delete entry for ${entry.name}?`)) return;
 
         setError(null);
-        const result = await deletePaymentEntry(entry.rowIndex, {
-            timestamp: entry.timestamp,
-            name: entry.name
-        });
+        setWarning(null);
+        setDeletingRow(entry.rowIndex);
+        const result = await deletePaymentEntry(entry.rowIndex, rowGuard(entry));
+        setDeletingRow(null);
 
         if (result.success) {
+            setWarning(result.warning || null);
             loadEntries();
+            onDataChanged?.();
         } else {
             setError(result.error || 'Could not delete the entry.');
         }
@@ -114,6 +133,10 @@ export function PaymentEntriesTable({ refreshTrigger }: { refreshTrigger?: numbe
                         <span>{error}</span>
                         <Button size="sm" variant="outline" onClick={loadEntries}>Refresh</Button>
                     </div>
+                )}
+
+                {warning && (
+                    <div className="mb-3 p-3 rounded-md bg-amber-100 text-amber-900 text-sm">⚠ {warning}</div>
                 )}
 
                 {loading ? (
@@ -140,7 +163,7 @@ export function PaymentEntriesTable({ refreshTrigger }: { refreshTrigger?: numbe
                                             <td className="p-2 whitespace-nowrap">{entry.name}</td>
                                             <td className="p-2">{formatDate(entry.paymentDate)}</td>
                                             <td className="p-2">₹{entry.amount}</td>
-                                            <td className="p-2">{entry.monthName}</td>
+                                            <td className="p-2">{entry.monthName ? formatMonthYY(entry.monthName) : '-'}</td>
                                             <td className="p-2 text-xs text-muted-foreground">{entry.remarks || '-'}</td>
                                             <td className="p-2 text-right">
                                                 <div className="flex gap-1 justify-end">
@@ -155,8 +178,9 @@ export function PaymentEntriesTable({ refreshTrigger }: { refreshTrigger?: numbe
                                                         size="sm"
                                                         variant="ghost"
                                                         onClick={() => handleDelete(entry)}
+                                                        disabled={deletingRow !== null}
                                                     >
-                                                        <Trash2 className="h-3 w-3 text-red-600" />
+                                                        <Trash2 className={`h-3 w-3 text-red-600 ${deletingRow === entry.rowIndex ? 'animate-pulse' : ''}`} />
                                                     </Button>
                                                 </div>
                                             </td>
@@ -225,10 +249,12 @@ export function PaymentEntriesTable({ refreshTrigger }: { refreshTrigger?: numbe
                         </div>
                         <div>
                             <label className="text-sm font-medium">Payment Date</label>
+                            {/* A date picker works in ISO, which is exactly what the
+                                server expects - no typed text to misread. */}
                             <Input
+                                type="date"
                                 value={editData.paymentDate || ''}
                                 onChange={(e) => setEditData({ ...editData, paymentDate: e.target.value })}
-                                placeholder="MM/DD/YYYY"
                             />
                         </div>
                         <div>

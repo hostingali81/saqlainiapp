@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { fetchAllRows } from '@/lib/fetch-all';
+import { isAdminUser } from '@/lib/admin-access';
 import { MONTHLY_RATE } from '@/lib/logic';
 import { Coins, Wallet, Smartphone, HandCoins, FileText, ArrowUpCircle, TrendingUp, Calendar, Mic } from 'lucide-react';
 import { formatIndianCurrency } from '@/lib/utils';
@@ -22,12 +23,12 @@ async function MonthlyHistoryContent() {
     // twice (the old `amount`-only query was a subset of this one).
     const [monthlyResult, chandaResult, expensesResult, bakayaResult] = await Promise.all([
         fetchAllRows<{ year: number; month: number; amount: number; user_id: number; id: number }>(
-            () => supabase.from('payment').select('year, month, amount, user_id, id')
+            () => supabase.from('payment').select('year, month, amount, user_id, id').order('id')
         ),
-        fetchAllRows<{ amount: number }>(() => supabase.from('db_chanda').select('amount')),
-        fetchAllRows<{ amount: number; head: string | null }>(() => supabase.from('expenses').select('amount, head')),
+        fetchAllRows<{ amount: number }>(() => supabase.from('db_chanda').select('amount').order('id')),
+        fetchAllRows<{ amount: number; head: string | null }>(() => supabase.from('expenses').select('amount, head').order('id')),
         fetchAllRows<{ bakaya_month: number; amount: number | null }>(
-            () => supabase.from('user_list').select('bakaya_month, amount')
+            () => supabase.from('user_list').select('bakaya_month, amount').order('id')
         ),
     ]);
 
@@ -202,7 +203,7 @@ async function MonthlyHistoryContent() {
             </div>
 
             {/* Audio Generator Link - admin only */}
-            {adminUser && (
+            {isAdminUser(adminUser) && (
             <div className="flex justify-center mb-8">
                 <Link href="/audio-generator">
                     <Button

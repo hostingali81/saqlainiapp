@@ -1,16 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { generateAudioScript, getAvailableMonths, getTotalAmount, AudioScriptResult } from '@/app/actions/audio';
+import { generateAudioScript, getAvailableMonths, AudioScriptResult } from '@/app/actions/audio';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '../../components/ui/textarea';
 import { Mic, Play, Download, Copy, Check, RotateCcw } from 'lucide-react';
-import { formatIndianCurrency } from '@/lib/utils';
 
 export default function AudioGeneratorPage() {
     const [availableMonths, setAvailableMonths] = useState<{ month: number; count: number }[]>([]);
-    const [totalAmount, setTotalAmount] = useState(0);
     const [selectedMonths, setSelectedMonths] = useState<number[]>([]);
     const [activeTab, setActiveTab] = useState<'comma' | 'range'>('comma');
 
@@ -34,7 +32,6 @@ export default function AudioGeneratorPage() {
     // Initial Fetch
     useEffect(() => {
         getAvailableMonths().then(setAvailableMonths);
-        getTotalAmount().then(setTotalAmount);
     }, []);
 
     const handleMonthClick = (month: number) => {

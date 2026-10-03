@@ -14,6 +14,7 @@ import {
     needsAllocationChoice,
     findCurrentMonth,
     findOldestDueMonth,
+    MONTHLY_RATE,
     PaymentAllocation,
     AllocationChoice
 } from '@/lib/logic';
@@ -25,7 +26,6 @@ interface SmartEntryFormProps {
     onPaymentSuccess?: () => void;
 }
 
-const MONTHLY_RATE = 125;
 const monthKeyOf = (a: { year: number; month: number }) => `${a.year}-${a.month}`;
 
 export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps) {
@@ -41,6 +41,9 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
     // Full history, not just the due months: deciding whether the destination is
     // ambiguous needs to know what the current month has already been paid.
     const [history, setHistory] = useState<MonthStatus[]>([]);
+    // Whose months `history` holds. Payments may only be worked out once this
+    // matches the selected member - see the effect below.
+    const [historyUserId, setHistoryUserId] = useState<string | null>(null);
     const [allocationChoice, setAllocationChoice] = useState<AllocationChoice | null>(null);
     const [loadingMonths, setLoadingMonths] = useState(false);
     const [reloadKey, setReloadKey] = useState(0);
@@ -73,19 +76,36 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
     }, []);
 
     useEffect(() => {
+        // Drop the previous member's months straight away. They used to linger
+        // while the new member's loaded, so a quick amount + Enter allocated
+        // the payment against the PREVIOUS member's due months.
+        setHistory([]);
+        setHistoryUserId(null);
+
         if (!selectedUserId) {
-            setHistory([]);
+            setLoadingMonths(false);
             return;
         }
 
         let cancelled = false;
         setLoadingMonths(true);
 
-        getUserProfile(parseInt(selectedUserId)).then(res => {
-            if (cancelled) return;
-            setHistory('error' in res ? [] : (res.financials?.history || []));
-            setLoadingMonths(false);
-        });
+        getUserProfile(parseInt(selectedUserId))
+            .then(res => {
+                if (cancelled) return;
+                if ('error' in res) {
+                    setResult({ error: `Could not load this member's months: ${res.error}` });
+                    return;
+                }
+                setHistory(res.financials?.history || []);
+                setHistoryUserId(selectedUserId);
+            })
+            .catch(() => {
+                if (!cancelled) setResult({ error: "Could not load this member's months. Please select them again." });
+            })
+            .finally(() => {
+                if (!cancelled) setLoadingMonths(false);
+            });
 
         if (!showNewEntryForm) {
             const t = setTimeout(() => amountInputRef.current?.focus(), 100);
@@ -117,6 +137,8 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
 
     const amountNum = Number(amount);
     const amountValid = amount.trim() !== '' && Number.isInteger(amountNum) && amountNum > 0;
+    // The loaded months belong to the member currently selected.
+    const historyReady = !!selectedUserId && historyUserId === selectedUserId && !loadingMonths;
 
     const dueMonths = useMemo(
         () => history
@@ -134,9 +156,9 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
      * defensible, so the admin picks rather than the system guessing.
      */
     const needsChoice = useMemo(() => (
-        !!selectedUser && amountValid
+        !!selectedUser && amountValid && historyReady
         && needsAllocationChoice(amountNum, history, MONTHLY_RATE, selectedUser.frequency)
-    ), [selectedUser, amountValid, amountNum, history]);
+    ), [selectedUser, amountValid, historyReady, amountNum, history]);
 
     // Only honour a choice while it is actually being asked for, so a leftover
     // value can never quietly redirect an unrelated payment.
@@ -148,11 +170,11 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
      * changing the amount (or the user) afterwards saved the stale split.
      */
     const allocations: PaymentAllocation[] = useMemo(() => {
-        if (!selectedUser || !amountValid) return [];
+        if (!selectedUser || !amountValid || !historyReady) return [];
         // Nothing is allocated until the admin answers the question.
         if (needsChoice && !allocationChoice) return [];
         return allocatePayment(amountNum, history, MONTHLY_RATE, selectedUser.frequency, effectiveChoice);
-    }, [selectedUser, amountValid, amountNum, history, needsChoice, allocationChoice, effectiveChoice]);
+    }, [selectedUser, amountValid, historyReady, amountNum, history, needsChoice, allocationChoice, effectiveChoice]);
 
     const amountFor = useCallback(
         (a: PaymentAllocation) => customAmounts[monthKeyOf(a)] ?? a.amount,
@@ -201,7 +223,7 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
         return Number.isInteger(v) && v > 0;
     });
     const totalsMatch = allocations.length > 0 && allocatedTotal === amountNum;
-    const canSubmit = !!selectedUserId && amountValid && allocations.length > 0
+    const canSubmit = !!selectedUserId && amountValid && historyReady && allocations.length > 0
         && allocationAmountsValid && totalsMatch && !loading;
 
     const handlePayment = async () => {

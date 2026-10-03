@@ -4,7 +4,11 @@ import { createClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/auth';
 import { User, Payment, PaymentActionResult, SimpleActionResult } from '@/types';
 import { calculateUserFinancials, allocatePayment, calculateBakayaStatus, getIstNow, needsAllocationChoice, countTrackedPaidMonths, findFirstPaymentMonth, MONTHLY_RATE, AllocationChoice } from '@/lib/logic';
-import { appendToSheet } from '@/lib/sheets';
+import { appendToSheet, getSheetData, parseRowSpan } from '@/lib/sheets';
+import { normalizeFullname, paymentIdForRow } from '@/lib/sheet-ids';
+import { istNow } from '@/lib/dates';
+import { syncPaymentsFromSheet } from '@/lib/sync-logic';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { revalidatePath } from 'next/cache';
 
 const pad = (n: number) => String(n).padStart(2, '0');
@@ -13,19 +17,22 @@ const pad = (n: number) => String(n).padStart(2, '0');
  * Timestamps for the Google Sheet, always in IST.
  * `new Date().toLocaleString()` follows the *server's* timezone, which is UTC
  * on Vercel - that put late-evening entries on the wrong date.
+ *
+ * ISO text, because Sheets reads ISO the same way in every locale; the
+ * columns' DD/MM/YYYY format takes care of how it looks. (MM/DD/YYYY text was
+ * only read correctly while the sheet stayed in a US locale.)
  */
 function istStamp() {
-    const ist = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
-    const y = ist.getUTCFullYear();
-    const m = pad(ist.getUTCMonth() + 1);
-    const d = pad(ist.getUTCDate());
-    const date = `${m}/${d}/${y}`;
+    const { date, time } = istNow();
     return {
         date,
-        timestamp: `${date} ${pad(ist.getUTCHours())}:${pad(ist.getUTCMinutes())}:${pad(ist.getUTCSeconds())}`,
-        isoDate: `${y}-${m}-${d}`
+        timestamp: `${date} ${time}`,
+        isoDate: date
     };
 }
+
+/** Month_F: the first day of the paid month, as an ISO date. */
+const monthCell = (year: number, month: number) => `${year}-${pad(month)}-01`;
 
 export async function getUserProfile(userId: number) {
     const supabase = await createClient();
@@ -102,6 +109,54 @@ async function recalculateBakaya(supabase: any, userId: number, frequency: strin
     return null;
 }
 
+/**
+ * Copies freshly appended FormResponses rows into the `payment` table under
+ * the payment_id the sheet itself assigns them (their position - see
+ * sheet-ids.ts). Returns why it could not, or null on success.
+ */
+async function mirrorPaymentsToDb(
+    appendedRange: string | null | undefined,
+    fullname: string,
+    userId: number,
+    allocations: Array<{ year: number; month: number; amount: number }>,
+    isoDate: string
+): Promise<string | null> {
+    const span = parseRowSpan(appendedRange);
+    if (!span || span.end - span.start + 1 !== allocations.length) {
+        return 'the sheet did not report where the rows were added';
+    }
+
+    let names: unknown[];
+    try {
+        names = (await getSheetData(`FormResponses!B2:B${span.end}`)).map(r => r?.[0]);
+    } catch (e: any) {
+        return `could not re-read the sheet: ${e?.message || 'unknown error'}`;
+    }
+
+    // Another admin deleting a row at the same moment would shift ours.
+    for (let row = span.start; row <= span.end; row++) {
+        if (String(names[row - 2] ?? '') !== fullname) {
+            return 'the sheet rows moved while saving';
+        }
+    }
+
+    const records = allocations.map((a, i) => ({
+        id: paymentIdForRow(names, span.start + i),
+        user_id: userId,
+        month: a.month,
+        year: a.year,
+        amount: a.amount,
+        date: isoDate
+    }));
+
+    // Upsert: if the database is behind the sheet, that id may still hold an
+    // old row - the sheet says it is this payment now. Service-role client
+    // because requireAdmin has already passed, and an upsert also needs UPDATE
+    // rights on `payment`, which RLS may not give the admin's session.
+    const { error } = await createAdminClient().from('payment').upsert(records);
+    return error ? error.message : null;
+}
+
 export async function processSmartPayment(
     userId: number,
     amount: number,
@@ -148,12 +203,26 @@ export async function processSmartPayment(
         return { error: 'This amount could top up the current month or go against an older due month. Please choose one and submit again.' };
     }
 
-    // 3. Calculate Allocation
+    // 3. Calculate Allocation. The choice only counts while it is being asked
+    // for - same rule as the form.
+    const choice = mustChoose ? allocationChoice : undefined;
+    const serverAllocations = allocatePayment(amount, financials.history, MONTHLY_RATE, user.frequency, choice);
+
     let allocations: Array<{ year: number; month: number; monthName?: string; amount: number }>;
     if (customAllocations && customAllocations.length > 0) {
+        // The form may only change the per-month AMOUNTS, never which months
+        // get paid. Without this, a form still holding another member's (or an
+        // outdated) due list could file the payment against months this member
+        // does not owe - nothing below would have caught it.
+        const expected = new Set(serverAllocations.map(a => `${a.year}-${a.month}`));
+        const sameMonths = customAllocations.length === expected.size
+            && customAllocations.every(a => expected.has(`${a.year}-${a.month}`));
+        if (!sameMonths) {
+            return { error: "This member's due months have changed since the form loaded. Please select the member again and re-enter the payment." };
+        }
         allocations = customAllocations;
     } else {
-        allocations = allocatePayment(amount, financials.history, MONTHLY_RATE, user.frequency, allocationChoice);
+        allocations = serverAllocations;
     }
 
     if (allocations.length === 0) {
@@ -204,83 +273,77 @@ export async function processSmartPayment(
         return { error: `Allocated total (Rs ${allocatedTotal}) does not match the paid amount (Rs ${amount}).` };
     }
 
-    // 5. Insert Payments.
-    // `id` is assigned here rather than by the database, so two admins saving at
-    // the same moment can pick the same id. Retry on a unique violation.
-    // The durable fix is an identity/sequence default on payment.id.
-    const { isoDate } = istStamp();
-    let insertError: any = null;
-
-    for (let attempt = 0; attempt < 5; attempt++) {
-        const { data: maxIdData, error: maxIdError } = await supabase
-            .from('payment')
-            .select('id')
-            .order('id', { ascending: false })
-            .limit(1);
-
-        if (maxIdError) {
-            return { error: `Failed to reserve payment ids: ${maxIdError.message}` };
-        }
-
-        let nextId = (maxIdData?.[0]?.id ?? 0) + 1;
-
-        const paymentsToInsert = allocations.map(a => ({
-            id: nextId++,
-            user_id: userId,
-            month: a.month,
-            year: a.year,
-            amount: a.amount,
-            date: isoDate
-        }));
-
-        const { error } = await supabase.from('payment').insert(paymentsToInsert);
-
-        if (!error) {
-            insertError = null;
-            break;
-        }
-
-        insertError = error;
-        // 23505 = unique_violation -> someone else took our ids, retry with a fresh max
-        if (error.code !== '23505') break;
-    }
-
-    if (insertError) {
-        console.error('Payment insert error:', insertError);
-        return { error: `Failed to record payments: ${insertError.message}` };
-    }
-
-    // 6. Recalculate the user's due months from the real data
-    const warnings: string[] = [];
-    const bakayaWarning = await recalculateBakaya(supabase, userId, user.frequency);
-    if (bakayaWarning) warnings.push(bakayaWarning);
-
-    // 7. Add to Google Sheet - Individual entries for each allocated month
+    // 5. The member's exact fullname as the sheet knows it. FormResponses rows
+    // are tied to members by fullname (DB!A, and a VLOOKUP in DB_PAYMENT). This
+    // used to write `${name} / ${fname}`, which does not reproduce the original
+    // for members with no "/" in their name or different spacing - the sheet
+    // took it for a NEW member and the payment moved to that phantom at the
+    // next sync, while the real member's month showed as due again.
+    let fullname: string;
     try {
-        const { timestamp, date: paymentDate } = istStamp();
+        const members = await getSheetData('DB!A2:B');
+        const row = members.find(r => Number(r?.[1]) === userId);
+        if (!row?.[0]) {
+            return { error: 'This member was not found in the Google Sheet. Please run Sync and try again.' };
+        }
+        // Member ids are positions in the sheet (see sheet-ids.ts). If this id
+        // now belongs to someone else, the app's member list is out of date.
+        if (normalizeFullname(row[0]) !== normalizeFullname(`${user.name} / ${user.fname || ''}`)) {
+            return { error: 'The member list in the Google Sheet has changed since the last sync. Please run Sync and try again.' };
+        }
+        fullname = String(row[0]);
+    } catch (e: any) {
+        return { error: `Could not read the member list from the Google Sheet, so nothing was saved: ${e?.message || 'unknown error'}` };
+    }
 
-        const rows = allocations.map(allocation => {
-            const monthFormatted = `${pad(allocation.month)}/01/${allocation.year}`;
-            const monthKey = `${allocation.year}-${allocation.month}`;
-            return [
-                timestamp,
-                `${user.name} / ${user.fname || ''}`,
-                paymentDate,
-                allocation.amount,
-                allocation.month,
-                monthFormatted,
-                allocation.year,
-                '', // Index 7 (Phone) - Empty for existing users via smart payment
-                remarks[monthKey] || '' // Index 8 (Remarks)
-            ];
-        });
+    // 6. Google Sheet FIRST - it is the source of truth: a sync makes the
+    // database match it and deletes anything it does not list. Writing the
+    // database first meant a failed sheet write left a payment behind that the
+    // next sync silently deleted. Now a failed write saves nothing at all.
+    const { timestamp, date: paymentDate, isoDate } = istStamp();
+    const rows = allocations.map(allocation => {
+        const monthFormatted = monthCell(allocation.year, allocation.month);
+        const monthKey = `${allocation.year}-${allocation.month}`;
+        return [
+            timestamp,
+            fullname,
+            paymentDate,
+            allocation.amount,
+            allocation.month,
+            monthFormatted,
+            allocation.year,
+            '', // Index 7 (Phone) - Empty for existing users via smart payment
+            remarks[monthKey] || '' // Index 8 (Remarks)
+        ];
+    });
 
+    let appendedRange: string | null | undefined;
+    try {
         // 9 columns (A..I) - the range used to say A:H, which did not cover Remarks.
-        await appendToSheet('FormResponses!A:I', rows);
+        const appended = await appendToSheet('FormResponses!A:I', rows);
+        appendedRange = appended.updates?.updatedRange;
     } catch (sheetError: any) {
         console.error('Failed to add to Google Sheet:', sheetError);
-        warnings.push(`Payment saved to the database, but the Google Sheet could not be updated: ${sheetError?.message || 'unknown error'}`);
+        return { error: `Could not save to the Google Sheet, so nothing was recorded. Please try again. (${sheetError?.message || 'unknown error'})` };
     }
+
+    // 7. Copy into the database under the ids the sheet just gave these rows,
+    // so the app shows the payment straight away and the next sync has nothing
+    // to change. (The old `max(id) + 1` guess drifted from the sheet's own
+    // numbering.) If that is not possible, a sync copies the sheet as-is.
+    const warnings: string[] = [];
+    const mirrorProblem = await mirrorPaymentsToDb(appendedRange, fullname, userId, allocations, isoDate);
+    if (mirrorProblem) {
+        console.warn(`Direct database copy skipped (${mirrorProblem}); running a payment sync instead.`);
+        const syncProblem = await syncPaymentsFromSheet();
+        if (syncProblem) {
+            warnings.push(`Saved in the Google Sheet, but the app could not be updated yet (${syncProblem}). It will appear after the next Sync - do not enter it again.`);
+        }
+    }
+
+    // 8. Recalculate the user's due months from the real data
+    const bakayaWarning = await recalculateBakaya(supabase, userId, user.frequency);
+    if (bakayaWarning) warnings.push(bakayaWarning);
 
     revalidatePath('/');
     revalidatePath('/admin');
@@ -303,14 +366,19 @@ export async function createNewUserPayment(data: {
     const auth = await requireAdmin();
     if ('error' in auth) return { error: auth.error };
 
-    const name = (data.name || '').trim();
-    const fname = (data.fname || '').trim();
+    // Single spaces only: the fullname becomes the member's key in the sheet.
+    const name = (data.name || '').replace(/\s+/g, ' ').trim();
+    const fname = (data.fname || '').replace(/\s+/g, ' ').trim();
     const phone = (data.phone || '').trim();
     const remarks = (data.remarks || '').trim();
     const amount = Number(data.amount);
 
     if (!name || !fname) {
         return { error: 'Name and father name are required.' };
+    }
+    // The sheet splits the fullname on "/" into name and father name.
+    if (name.includes('/') || fname.includes('/')) {
+        return { error: 'Name and father name cannot contain "/".' };
     }
     // This used to use `parseInt`, and `NaN <= 0` is false - so a blank or
     // non-numeric amount slipped through and landed in the sheet as an empty cell.
@@ -324,16 +392,32 @@ export async function createNewUserPayment(data: {
         return { error: 'Invalid payment frequency.' };
     }
 
+    const fullname = `${name} / ${fname}`;
+
+    // The sheet treats every new fullname as a new member (UNIQUE over
+    // FormResponses), so the same person typed with different case or spacing
+    // would become a second member with their own id and due months.
+    try {
+        const existing = await getSheetData('DB!A2:A');
+        const wanted = normalizeFullname(fullname);
+        const match = existing.find(r => r?.[0] && normalizeFullname(r[0]) === wanted);
+        if (match) {
+            return { error: `"${match[0]}" is already a member. Select them from the list instead of adding a new entry.` };
+        }
+    } catch (e: any) {
+        return { error: `Could not check the existing members in the Google Sheet: ${e?.message || 'unknown error'}` };
+    }
+
     const { year: currentYear, month: currentMonth } = getIstNow();
 
     // Add to Google Sheet only
     try {
         const { timestamp, date: paymentDate } = istStamp();
-        const monthFormatted = `${pad(currentMonth)}/01/${currentYear}`;
+        const monthFormatted = monthCell(currentYear, currentMonth);
 
         const row = [
             timestamp,
-            `${name} / ${fname}`,
+            fullname,
             paymentDate,
             amount,
             currentMonth,

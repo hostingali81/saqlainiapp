@@ -1,3 +1,5 @@
+import { formatDMY, istToday } from '@/lib/dates';
+
 export default function PrivacyPolicyPage() {
     return (
         <main className="min-h-screen bg-background pb-24">
@@ -106,7 +108,7 @@ export default function PrivacyPolicyPage() {
                         </section>
 
                         <p className="text-sm text-gray-500 mt-8">
-                            Last Updated: {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+                            Last Updated: {formatDMY(istToday())}
                         </p>
                     </div>
                 </div>

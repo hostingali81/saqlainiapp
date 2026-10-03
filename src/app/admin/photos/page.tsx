@@ -1,4 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
+import { isAdminUser } from '@/lib/admin-access';
+import { fetchAllRows } from '@/lib/fetch-all';
 import { PhotoManagement } from '@/components/PhotoManagement';
 import { User } from '@/types';
 import { redirect } from 'next/navigation';
@@ -10,41 +12,47 @@ export default async function PhotosPage() {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
-    if (!user) {
+    if (!isAdminUser(user)) {
         redirect('/admin/login');
     }
 
-    const { data: users, error } = await supabase
+    // Paged: a plain select stops at 1000 rows and would silently drop members.
+    const { rows: users, error } = await fetchAllRows<User>(() => supabase
         .from('user_list')
         .select('*')
-        .order('name', { ascending: true });
+        .order('name', { ascending: true })
+        .order('id', { ascending: true }));
 
     if (error) {
         return <div>Error loading users.</div>;
     }
 
-    // List all files in the small_image folder
-    const { data: fileList, error: storageError } = await supabase
-        .storage
-        .from('user-photos')
-        .list('small_image', {
-            limit: 1000,
-            offset: 0,
-            sortBy: { column: 'name', order: 'asc' },
-        });
-
-    // Create a Set of user IDs that have images
+    // List all files in the small_image folder. Storage listing is capped per
+    // call too, so keep paging until a short page comes back.
     const existingImages = new Set<string>();
-    if (fileList) {
+    const LIST_PAGE = 1000;
+    for (let offset = 0; offset < 100 * LIST_PAGE; offset += LIST_PAGE) {
+        const { data: fileList } = await supabase
+            .storage
+            .from('user-photos')
+            .list('small_image', {
+                limit: LIST_PAGE,
+                offset,
+                sortBy: { column: 'name', order: 'asc' },
+            });
+
+        if (!fileList || fileList.length === 0) break;
+
         fileList.forEach(file => {
             if (file.name.endsWith('.jpg')) {
-                const userId = file.name.replace('.jpg', '');
-                existingImages.add(userId);
+                existingImages.add(file.name.replace('.jpg', ''));
             }
         });
+
+        if (fileList.length < LIST_PAGE) break;
     }
 
-    const usersWithImages = (users as User[]).map(user => {
+    const usersWithImages = users.map(user => {
         return {
             ...user,
             hasImage: existingImages.has(user.id.toString())

@@ -1,17 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
+import { requireAdmin } from '@/lib/auth';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function POST(request: NextRequest) {
     try {
-        // getSession() reads the cookie without verifying it with the auth
-        // server, and this handler goes on to use the service-role key - so the
-        // check has to be the verified one.
-        const supabase = await createClient();
-        const { data: { user }, error: authError } = await supabase.auth.getUser();
-
-        if (authError || !user) {
-            return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        // This handler goes on to use the service-role key, so the check has to
+        // be the verified one (getUser, not getSession) and must be admin-only.
+        const auth = await requireAdmin();
+        if ('error' in auth) {
+            return NextResponse.json({ error: auth.error }, { status: 401 });
         }
 
         const body = await request.json();

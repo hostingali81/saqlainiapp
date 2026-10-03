@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { isAdminUser } from '@/lib/admin-access';
 import { redirect } from 'next/navigation';
 import { FormChandaClient } from '@/components/admin/FormChandaClient';
 import { getSheetData } from '@/lib/sheets';
@@ -8,7 +9,7 @@ export default async function FormChandaPage() {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
-    if (!user) {
+    if (!isAdminUser(user)) {
         redirect('/admin/login');
     }
 

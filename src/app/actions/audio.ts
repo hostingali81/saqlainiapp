@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server';
 import { requireAdmin } from '@/lib/auth';
+import { fetchAllRows } from '@/lib/fetch-all';
 
 const HINDI_NUMBERS: { [key: number]: string } = {
     0: 'शून्य', 1: 'एक', 2: 'दो', 3: 'तीन', 4: 'चार', 5: 'पांच', 6: 'छह', 7: 'सात', 8: 'आठ', 9: 'नौ', 10: 'दस',
@@ -38,20 +39,21 @@ export async function generateAudioScript(months: number[]): Promise<AudioScript
             return { script: '', count: 0, error: 'Please select at least one month.' };
         }
 
-        const { data: users, error } = await supabase
+        // Paged so a long list is not cut off at 1000 names.
+        const { rows: users, error } = await fetchAllRows<{ hindi_name: string; bakaya_month: number; id: number }>(() => supabase
             .from('user_list')
             .select('hindi_name, bakaya_month, id')
             .eq('frequency', 'Regular')
             .in('bakaya_month', months)
             .order('bakaya_month', { ascending: false })
-            .order('id', { ascending: true });
+            .order('id', { ascending: true }));
 
         if (error) {
             console.error('Supabase error:', error);
             return { script: '', count: 0, error: 'Database error occurred.' };
         }
 
-        if (!users || users.length === 0) {
+        if (users.length === 0) {
             return { script: "दी गई शर्तों के साथ कोई 'Regular' उपयोगकर्ता नहीं मिला।", count: 0 };
         }
 
@@ -78,18 +80,16 @@ export async function getAvailableMonths(): Promise<{ month: number; count: numb
 
     const supabase = await createClient();
 
-    // Note: Supabase doesn't support GROUP BY easily with simple SDK in one go for counts sometimes,
-    // but let's try rpc if logic is complex. 
-    // Actually, simply fetching all regular users and agg in JS is fine for small datasets (~1000 records).
-    // Or we can use a raw query if needed, but let's stick to simple select for now.
-
-    const { data: users } = await supabase
+    // Aggregated in JS. Paged, because a plain select stops at 1000 rows and
+    // the counts would quietly come out short.
+    const { rows: users, error } = await fetchAllRows<{ bakaya_month: number }>(() => supabase
         .from('user_list')
         .select('bakaya_month')
         .eq('frequency', 'Regular')
-        .gt('bakaya_month', 0);
+        .gt('bakaya_month', 0)
+        .order('id', { ascending: true }));
 
-    if (!users) return [];
+    if (error) return [];
 
     const counts: { [key: number]: number } = {};
     users.forEach(u => {
@@ -100,16 +100,4 @@ export async function getAvailableMonths(): Promise<{ month: number; count: numb
     return Object.entries(counts)
         .map(([m, c]) => ({ month: parseInt(m), count: c }))
         .sort((a, b) => a.month - b.month);
-}
-
-export async function getTotalAmount(): Promise<number> {
-    const supabase = await createClient();
-    const { data: paymentData, error } = await supabase.from('payment').select('amount');
-
-    if (error) {
-        console.error('Error fetching total amount:', error);
-        return 0;
-    }
-
-    return paymentData?.reduce((sum, p) => sum + (p.amount || 0), 0) || 0;
 }

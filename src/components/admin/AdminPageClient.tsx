@@ -20,7 +20,8 @@ export function AdminPageClient({ users }: { users: User[] }) {
     return (
         <>
             <SmartEntryForm users={users} onPaymentSuccess={handlePaymentSuccess} />
-            <PaymentEntriesTable refreshTrigger={refreshTrigger} />
+            {/* Editing or deleting an entry re-syncs members' due months too. */}
+            <PaymentEntriesTable refreshTrigger={refreshTrigger} onDataChanged={() => router.refresh()} />
         </>
     );
 }

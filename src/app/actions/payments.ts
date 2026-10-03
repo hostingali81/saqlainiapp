@@ -1,6 +1,9 @@
 'use server'
 
-import { getSheetData, updateSheetRow, deleteSheetRow } from '@/lib/sheets';
+import { getSheetData, updateSheetRow, deleteSheetRow, verifySheetRow, readNormalizedRows, DateColumns } from '@/lib/sheets';
+import { isIsoDate } from '@/lib/dates';
+import { memberIdsPreserved, isFirstOfSeveral } from '@/lib/sheet-ids';
+import { syncPaymentsFromSheet } from '@/lib/sync-logic';
 import { requireAdmin } from '@/lib/auth';
 import { PaymentEntriesResult, SimpleActionResult } from '@/types';
 import { revalidatePath } from 'next/cache';
@@ -24,34 +27,49 @@ interface PaymentEntryInput {
 interface RowGuard {
     timestamp?: string;
     name?: string;
+    amount?: string;
+    month?: string;
+    year?: string;
 }
 
+/** FormResponses date columns: A Timestamp, C Payment Date, F Month_F. */
+const DATES: DateColumns = { 0: 'datetime', 2: 'date', 5: 'date' };
+
 /**
- * `rowIndex` is computed when the list is fetched, so by the time Edit/Delete
- * runs the sheet may have shifted (another admin deleting a row, a manual edit,
- * a re-sort) and the index would point at somebody else's payment.
- * Re-read the row and confirm it is still the one the admin selected.
+ * See verifySheetRow. Timestamp + name alone could not tell apart the rows of
+ * one multi-month payment (they share both), so amount/month/year are checked too.
  */
-async function assertRowUnchanged(rowIndex: number, expected: RowGuard): Promise<string | null> {
-    // Row 0 is the header; data starts at index 1.
-    if (!Number.isInteger(rowIndex) || rowIndex < 1) {
-        return 'Invalid entry reference. Please refresh the list and try again.';
-    }
+function assertRowUnchanged(rowIndex: number, expected: RowGuard): Promise<string | null> {
+    return verifySheetRow(SHEET, 'I', rowIndex, {
+        0: expected.timestamp,
+        1: expected.name,
+        3: expected.amount,
+        4: expected.month,
+        6: expected.year
+    }, DATES);
+}
 
-    const sheetRow = rowIndex + 1;
-    const rows = await getSheetData(`${SHEET}!A${sheetRow}:I${sheetRow}`);
-    const row = rows?.[0];
+const MEMBER_ID_SHIFT_ERROR =
+    "This change would renumber other members: member ids in the Google Sheet follow the order in which names first appear, " +
+    "and this entry decides where a member falls in that order. Photos would then show on the wrong people. " +
+    "Change the amount, month or remarks instead, or make this change in the sheet itself and re-check the photos.";
 
-    if (!row) {
-        return 'This entry no longer exists. Please refresh the list and try again.';
-    }
+const FIRST_ROW_ERROR =
+    "This is this member's first entry. The DB sheet reads their phone number and Regular/One Time setting from it, " +
+    "so deleting it or changing its name would lose both. Change the amount, month or remarks instead.";
 
-    const norm = (v: any) => String(v ?? '').trim();
-    if (norm(row[0]) !== norm(expected.timestamp) || norm(row[1]) !== norm(expected.name)) {
-        return 'This entry changed since the list was loaded. Please refresh the list and try again.';
-    }
+/** FormResponses!B2:B - index 0 is the first data row (rowIndex 1). */
+async function readNameColumn(): Promise<unknown[]> {
+    return (await getSheetData(`${SHEET}!B2:B`)).map(r => r?.[0]);
+}
 
-    return null;
+/** Sync members + payments after changing the sheet; a warning if that failed. */
+async function refreshFromSheet(done: string): Promise<string | undefined> {
+    const problem = await syncPaymentsFromSheet();
+    revalidatePath('/', 'layout');
+    return problem
+        ? `${done}, but the app could not refresh (${problem}). Run Sync from the admin panel.`
+        : undefined;
 }
 
 export async function getPaymentEntries(page: number = 1, perPage: number = 10): Promise<PaymentEntriesResult> {
@@ -61,7 +79,9 @@ export async function getPaymentEntries(page: number = 1, perPage: number = 10):
     }
 
     try {
-        const data = await getSheetData(`${SHEET}!A:I`);
+        // Raw values with dates as ISO - the display text would depend on the
+        // sheet's date format, and writing it back on Edit swapped day and month.
+        const data = await readNormalizedRows(`${SHEET}!A:I`, DATES);
 
         if (!data || data.length <= 1) {
             return { entries: [], total: 0, page, perPage };
@@ -101,8 +121,26 @@ export async function updatePaymentEntry(rowIndex: number, data: PaymentEntryInp
         const guardError = await assertRowUnchanged(rowIndex, expected);
         if (guardError) return { error: guardError };
 
-        const name = String(data.name ?? '').trim();
-        if (!name) return { error: 'Name is required.' };
+        const typedName = String(data.name ?? '').trim();
+        if (!typedName) return { error: 'Name is required.' };
+
+        // The name is the member's key in the sheet (see sheet-ids.ts).
+        // Unchanged apart from surrounding spaces -> keep the cell exactly as
+        // it was, so the member is not mistaken for a new one.
+        const names = await readNameColumn();
+        const currentName = String(names[rowIndex - 1] ?? '');
+        const name = currentName.trim() === typedName ? currentName : typedName;
+
+        if (name !== currentName) {
+            if (isFirstOfSeveral(names, rowIndex - 1)) {
+                return { error: FIRST_ROW_ERROR };
+            }
+            const after = [...names];
+            after[rowIndex - 1] = name;
+            if (!memberIdsPreserved(names, after)) {
+                return { error: MEMBER_ID_SHIFT_ERROR };
+            }
+        }
 
         const amount = Number(data.amount);
         if (!Number.isFinite(amount) || amount <= 0) {
@@ -118,16 +156,23 @@ export async function updatePaymentEntry(rowIndex: number, data: PaymentEntryInp
             return { error: 'Year must be a valid 4-digit year.' };
         }
 
-        // Column F mirrors month + year as MM/01/YYYY. It was written straight
-        // back from the loaded entry, so editing Month or Year left the two
-        // columns describing different months.
-        const monthName = `${String(month).padStart(2, '0')}/01/${year}`;
+        // ISO from the date picker; written as ISO so no locale can misread it.
+        const paymentDate = String(data.paymentDate ?? '').trim();
+        if (!isIsoDate(paymentDate)) {
+            return { error: 'Please pick a valid payment date.' };
+        }
 
-        const range = `${SHEET}!A${rowIndex + 1}:I${rowIndex + 1}`;
+        // Column F mirrors month + year (first day of that month). It was
+        // written straight back from the loaded entry, so editing Month or Year
+        // left the two columns describing different months.
+        const monthName = `${year}-${String(month).padStart(2, '0')}-01`;
+
+        // From column B: the timestamp is never edited, so it is not rewritten.
+        // (Writing it back as display text is how dates got swapped before.)
+        const range = `${SHEET}!B${rowIndex + 1}:I${rowIndex + 1}`;
         const values = [[
-            data.timestamp ?? '',
             name,
-            data.paymentDate ?? '',
+            paymentDate,
             amount,
             month,
             monthName,
@@ -137,8 +182,12 @@ export async function updatePaymentEntry(rowIndex: number, data: PaymentEntryInp
         ]];
 
         await updateSheetRow(range, values);
+
+        // The app reads from the database, not the sheet - bring it up to date
+        // now instead of showing the old amount/month until the next sync.
+        const warning = await refreshFromSheet('Updated in the Google Sheet');
         revalidatePath('/admin');
-        return { success: true };
+        return { success: true, warning };
     } catch (error: any) {
         console.error('Error updating entry:', error);
         return { error: error?.message || 'Failed to update entry.' };
@@ -153,9 +202,25 @@ export async function deletePaymentEntry(rowIndex: number, expected: RowGuard): 
         const guardError = await assertRowUnchanged(rowIndex, expected);
         if (guardError) return { error: guardError };
 
+        // Deleting a member's first (or only) payment row moves or removes
+        // them in the sheet's member list, renumbering everyone after them.
+        const names = await readNameColumn();
+        if (isFirstOfSeveral(names, rowIndex - 1)) {
+            return { error: FIRST_ROW_ERROR };
+        }
+        const after = [...names];
+        after.splice(rowIndex - 1, 1);
+        if (!memberIdsPreserved(names, after)) {
+            return { error: MEMBER_ID_SHIFT_ERROR };
+        }
+
         await deleteSheetRow(rowIndex, FORM_RESPONSES_SHEET_ID);
+
+        // Every payment after this row now has a new payment_id in the sheet;
+        // re-align the database right away rather than at the next sync.
+        const warning = await refreshFromSheet('Deleted from the Google Sheet');
         revalidatePath('/admin');
-        return { success: true };
+        return { success: true, warning };
     } catch (error: any) {
         console.error('Error deleting entry:', error);
         return { error: error?.message || 'Failed to delete entry.' };

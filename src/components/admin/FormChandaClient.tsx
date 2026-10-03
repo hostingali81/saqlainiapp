@@ -9,6 +9,7 @@ import { Loader2, Edit, Trash2 } from 'lucide-react';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { AdminNav } from '@/components/admin/AdminNav';
+import { formatDMY, formatDMYTime, istToday } from '@/lib/dates';
 
 interface FormChandaClientProps {
     existingNames: Array<{ name: string; nameHindi: string }>;
@@ -27,7 +28,7 @@ export function FormChandaClient({ existingNames }: FormChandaClientProps) {
     const [formData, setFormData] = useState({
         name: '',
         nameHindi: '',
-        paymentDate: new Date().toISOString().split('T')[0],
+        paymentDate: istToday(),
         amount: '',
         remarks: ''
     });
@@ -43,7 +44,7 @@ export function FormChandaClient({ existingNames }: FormChandaClientProps) {
                 setFormData({
                     name: found.name,
                     nameHindi: found.nameHindi,
-                    paymentDate: new Date().toISOString().split('T')[0],
+                    paymentDate: istToday(),
                     amount: '',
                     remarks: ''
                 });
@@ -76,7 +77,7 @@ export function FormChandaClient({ existingNames }: FormChandaClientProps) {
             setFormData({
                 name: '',
                 nameHindi: '',
-                paymentDate: new Date().toISOString().split('T')[0],
+                paymentDate: istToday(),
                 amount: '',
                 remarks: ''
             });
@@ -91,7 +92,7 @@ export function FormChandaClient({ existingNames }: FormChandaClientProps) {
     async function handleUpdate() {
         if (!editingRow) return;
         setEditMessage('');
-        const result = await updateFormChandaEntry(editingRow.rowIndex, editData);
+        const result = await updateFormChandaEntry(editingRow.rowIndex, editData, editingRow);
         if (result.success) {
             setShowEditDialog(false);
             setEditingRow(null);
@@ -108,10 +109,11 @@ export function FormChandaClient({ existingNames }: FormChandaClientProps) {
         setShowEditDialog(true);
     }
 
-    async function handleDelete(rowIndex: number) {
+    // The whole entry goes along so the server can confirm the row has not moved.
+    async function handleDelete(entry: any) {
         if (!confirm('Delete this entry?')) return;
         setMessage('');
-        const result = await deleteFormChandaEntry(rowIndex);
+        const result = await deleteFormChandaEntry(entry.rowIndex, entry);
         if (result.success) {
             loadEntries();
         } else {
@@ -148,7 +150,7 @@ export function FormChandaClient({ existingNames }: FormChandaClientProps) {
                             setFormData({
                                 name: '',
                                 nameHindi: '',
-                                paymentDate: new Date().toISOString().split('T')[0],
+                                paymentDate: istToday(),
                                 amount: '',
                                 remarks: ''
                             });
@@ -258,16 +260,16 @@ export function FormChandaClient({ existingNames }: FormChandaClientProps) {
                                 </tr>
                             ) : entries.map((entry, idx) => (
                                 <tr key={idx} style={{ borderBottom: '1px solid #E5D3AA' }}>
-                                    <td className="p-3 text-xs" style={{ color: '#165E4B' }}>{entry.timestamp}</td>
+                                    <td className="p-3 text-xs" style={{ color: '#165E4B' }}>{formatDMYTime(entry.timestamp)}</td>
                                     <td className="p-3 text-xs" style={{ color: '#4A3728' }}>{entry.name}</td>
                                     <td className="p-3 text-xs" style={{ color: '#4A3728' }}>{entry.nameHindi}</td>
-                                    <td className="p-3 text-xs" style={{ color: '#165E4B' }}>{entry.paymentDate}</td>
+                                    <td className="p-3 text-xs" style={{ color: '#165E4B' }}>{formatDMY(entry.paymentDate)}</td>
                                     <td className="p-3 text-xs font-bold" style={{ color: '#059669' }}>₹{entry.amount}</td>
                                     <td className="p-3 text-xs" style={{ color: '#165E4B' }}>{entry.remarks}</td>
                                     <td className="p-3">
                                         <div className="flex gap-1">
                                             <Button size="sm" variant="ghost" onClick={() => handleEdit(entry)}><Edit className="h-4 w-4" /></Button>
-                                            <Button size="sm" variant="ghost" onClick={() => handleDelete(entry.rowIndex)}><Trash2 className="h-4 w-4" /></Button>
+                                            <Button size="sm" variant="ghost" onClick={() => handleDelete(entry)}><Trash2 className="h-4 w-4" /></Button>
                                         </div>
                                     </td>
                                 </tr>

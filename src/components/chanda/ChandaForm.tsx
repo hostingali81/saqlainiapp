@@ -12,6 +12,10 @@ import {
     TooltipProvider,
     TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { formatDMY, istToday } from '@/lib/dates';
+
+// DD-MM-YYYY (IST) for file names - a "/" cannot appear in one.
+const fileDate = () => formatDMY(istToday()).replace(/\//g, '-');
 
 export function ChandaForm() {
     const [groups, setGroups] = useState<ChandaGroup[]>([]);
@@ -130,7 +134,7 @@ export function ChandaForm() {
                         margin: [0, 0, 0, 5]
                     },
                     {
-                        text: `Generated: ${new Date().toLocaleDateString('en-GB')}`,
+                        text: `Generated: ${formatDMY(istToday())}`,
                         fontSize: 10,
                         color: '#666666',
                         alignment: 'center',
@@ -216,7 +220,7 @@ export function ChandaForm() {
             // CRITICAL: Pass VFS and fonts directly to createPdf
             // Signature: createPdf(docDefinition, tableLayouts, fonts, vfs)
             (pdfMake as any).createPdf(docDefinition, null, customFonts, vfs).download(
-                `Chanda_Records_${new Date().toISOString().split('T')[0]}.pdf`,
+                `Chanda_Records_${fileDate()}.pdf`,
                 () => setIsExporting(false) // Callback when done
             );
 
@@ -280,7 +284,7 @@ export function ChandaForm() {
 
                 setExportError('Could not load Hindi fonts. Downloading a version with default fonts - Hindi text may not render correctly.');
                 (pdfMake as any).createPdf(fallbackDocDef).download(
-                    `Chanda_Records_Fallback_${new Date().toISOString().split('T')[0]}.pdf`,
+                    `Chanda_Records_Fallback_${fileDate()}.pdf`,
                     () => setIsExporting(false) // Callback
                 );
 

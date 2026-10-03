@@ -4,6 +4,10 @@
  * Several totals were computed from a plain `.select()` and silently went wrong
  * the moment a table crossed 1000 rows - the numbers still rendered, they were
  * just short. This pages until the source is exhausted.
+ *
+ * The query should end in a unique `.order(...)` (e.g. by id): offset paging
+ * without ORDER BY is not guaranteed to be stable, so rows could be skipped
+ * or counted twice across pages.
  */
 const PAGE_SIZE = 1000;
 

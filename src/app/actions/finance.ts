@@ -3,18 +3,62 @@
 import { createClient } from '@/lib/supabase/server';
 import { Expense, ChandaEntry } from '@/types';
 import { fetchAllRows } from '@/lib/fetch-all';
+import { formatDMY } from '@/lib/dates';
 
-export async function getExpenses(page: number = 1, limit: number = 50, category?: string) {
-    const supabase = await createClient();
+/** Treat the user's text literally inside an ILIKE pattern. */
+function escapeLike(text: string) {
+    return text.replace(/[\\%_]/g, c => `\\${c}`);
+}
 
-    let query = supabase
-        .from('expenses') // dataset is in 'expenses' not 'Expenses'
-        .select('*', { count: 'exact' })
-        .order('date', { ascending: false }); // Column is 'date' in lowercase
-
+/**
+ * Category + search filters shared by the list, the stats and the PDF, so
+ * all three always describe the same set of expenses.
+ */
+function filterExpenses<Q extends { eq: (col: string, v: string) => Q; ilike: (col: string, v: string) => Q }>(
+    query: Q,
+    category?: string,
+    search?: string
+): Q {
     if (category && category !== 'All') {
         query = query.eq('category', category); // Column 'category' lowercase
     }
+    const term = search?.trim();
+    if (term) {
+        query = query.ilike('details', `%${escapeLike(term)}%`);
+    }
+    return query;
+}
+
+function formatExpense(item: any): Expense {
+    return {
+        ...item,
+        // Map lowercase DB columns to the Type 'Expense' (PascalCase fields)
+        ExpenseID: item.id,
+        Category: item.category,
+        Details: item.details, // Fixed: Map to 'Details' (was Description)
+        // DD/MM/YYYY like every other date in the app. Straight from the ISO
+        // text - `new Date()` would shift a date-only value by timezone.
+        PaymentDate: formatDMY(item.date),
+        Amount: item.amount,
+        Remarks: item.remarks,
+        Head: item.head || 'N/A'
+    };
+}
+
+export async function getExpenses(page: number = 1, limit: number = 50, category?: string, search?: string) {
+    const supabase = await createClient();
+
+    // Search runs in the database. It used to filter only the 50 rows of the
+    // current page in the browser, so anything on another page was "not found".
+    const query = filterExpenses(
+        supabase
+            .from('expenses') // dataset is in 'expenses' not 'Expenses'
+            .select('*', { count: 'exact' })
+            .order('date', { ascending: false }) // Column is 'date' in lowercase
+            .order('id', { ascending: false }),
+        category,
+        search
+    );
 
     const from = (page - 1) * limit;
     const to = from + limit - 1;
@@ -26,22 +70,33 @@ export async function getExpenses(page: number = 1, limit: number = 50, category
         return { data: [], total: 0 };
     }
 
-    // Format date similar to PHP: d M Y
-    const formattedData = data?.map((item: any) => ({
-        ...item,
-        // Map lowercase DB columns to the Type 'Expense' (PascalCase fields)
-        ExpenseID: item.id,
-        Category: item.category,
-        Details: item.details, // Fixed: Map to 'Details' (was Description)
-        PaymentDate: new Date(item.date).toLocaleDateString('en-GB', {
-            day: '2-digit', month: 'short', year: 'numeric'
-        }),
-        Amount: item.amount,
-        Remarks: item.remarks,
-        Head: item.head || 'N/A'
-    })) || [];
+    return { data: (data || []).map(formatExpense), total: count || 0 };
+}
 
-    return { data: formattedData as Expense[], total: count || 0 };
+/**
+ * Every matching expense, for the PDF. The export used to ask getExpenses for
+ * 10000 rows, but Supabase returns at most 1000 per request - so the PDF was
+ * cut short while its header still showed the full transaction count.
+ */
+export async function getAllExpenses(category?: string, search?: string) {
+    const supabase = await createClient();
+
+    const { rows, error } = await fetchAllRows<any>(() => filterExpenses(
+        supabase
+            .from('expenses')
+            .select('*')
+            .order('date', { ascending: false })
+            .order('id', { ascending: false }),
+        category,
+        search
+    ));
+
+    if (error) {
+        console.error('Error fetching expenses for export:', error);
+        return { data: [] as Expense[], error };
+    }
+
+    return { data: rows.map(formatExpense), error: null };
 }
 
 export interface ChandaGroup {
@@ -76,14 +131,15 @@ export async function getChandaEntries(search: string = '') {
     }
 
     // Calculate stats from grouped data
+    // Dates arrive as ISO; they are only ever displayed, so show DD/MM/YYYY.
     const groups: ChandaGroup[] = (data || []).map((item: any) => ({
         id: item.display_name,
         name: item.display_name,
         totalAmount: Number(item.total_amount || 0),
         count: Number(item.donation_count || 0),
-        latestDate: item.latest_date,
+        latestDate: formatDMY(item.latest_date),
         latestRemarks: item.latest_remarks || '',
-        donations: item.donations || []
+        donations: (item.donations || []).map((d: any) => ({ ...d, Date: formatDMY(d.Date) }))
     }));
 
     const totalAmount = groups.reduce((sum: number, g: ChandaGroup) => sum + g.totalAmount, 0);
@@ -108,8 +164,11 @@ async function getChandaEntriesLegacy(search: string = '') {
             .select('*')
             .order('id', { ascending: false });
 
-        if (search) {
-            query = query.or(`name.ilike.%${search}%,hindi_name.ilike.%${search}%,remarks.ilike.%${search}%`);
+        // The text goes into a PostgREST filter string, where `,` `(` `)` and
+        // quotes are syntax - left in, they could break or extend the filter.
+        const term = search.replace(/[,()"\\]/g, ' ').trim();
+        if (term) {
+            query = query.or(`name.ilike.%${term}%,hindi_name.ilike.%${term}%,remarks.ilike.%${term}%`);
         }
         return query;
     });
@@ -125,7 +184,7 @@ async function getChandaEntriesLegacy(search: string = '') {
         Name: item.name,
         NameHindi: item.hindi_name,
         hindi_name: item.hindi_name,
-        Date: item.date,
+        Date: formatDMY(item.date),
         Amount: item.amount,
         Remarks: item.remarks
     })) as ChandaEntry[];
@@ -164,18 +223,14 @@ async function getChandaEntriesLegacy(search: string = '') {
     };
 }
 
-export async function getExpensePageStats(category?: string) {
+export async function getExpensePageStats(category?: string, search?: string) {
     const supabase = await createClient();
 
     // A plain select stops at 1000 rows, so these headline numbers quietly
     // went short once the expenses table grew past that.
-    const { rows: expenses, error } = await fetchAllRows<{ amount: number; category: string | null }>(() => {
-        let query = supabase.from('expenses').select('amount, category');
-        if (category && category !== 'All') {
-            query = query.eq('category', category);
-        }
-        return query;
-    });
+    const { rows: expenses, error } = await fetchAllRows<{ amount: number; category: string | null }>(() =>
+        filterExpenses(supabase.from('expenses').select('amount, category').order('id'), category, search)
+    );
 
     if (error) {
         console.error('Error fetching expense stats:', error);
@@ -207,9 +262,10 @@ export async function getCategories() {
 
     // FALLBACK: Old method (fetches all expenses)
     // Useful if the user hasn't run the new SQL migration yet.
-    const { data: rawData, error: rawError } = await supabase
-        .from('expenses')
-        .select('category');
+    // Paged - categories that only appear after the first 1000 rows were missing.
+    const { rows: rawData, error: rawError } = await fetchAllRows<{ category: string | null }>(
+        () => supabase.from('expenses').select('category').order('id')
+    );
 
     if (rawError) {
         console.error('Error fetching categories:', rawError);
@@ -217,6 +273,6 @@ export async function getCategories() {
     }
 
     // Extract unique non-null categories
-    const categories = Array.from(new Set(rawData.map((item: any) => item.category).filter(Boolean)));
+    const categories = Array.from(new Set(rawData.map(item => item.category).filter(Boolean)));
     return categories.sort();
 }

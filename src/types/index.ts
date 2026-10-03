@@ -57,9 +57,15 @@ export interface PaymentActionResult {
 export interface SimpleActionResult {
     success?: boolean;
     error?: string;
+    /** Done, but a follow-up step (e.g. refreshing the app from the sheet) failed. */
+    warning?: string;
 }
 
-/** A row of the FormResponses sheet as shown in the admin table. */
+/**
+ * A row of the FormResponses sheet as shown in the admin table. Dates are ISO
+ * (timestamp "YYYY-MM-DDTHH:MM:SS", paymentDate and monthName "YYYY-MM-DD") -
+ * the UI shows them as DD/MM/YYYY, and monthName as "Sep-26" like the sheet.
+ */
 export interface PaymentEntryRow {
     rowIndex: number;
     timestamp: string;

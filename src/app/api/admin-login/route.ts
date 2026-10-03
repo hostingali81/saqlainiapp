@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { checkRateLimit, clearRateLimit, clientIp } from '@/lib/rate-limit';
+import { isAdminUser } from '@/lib/admin-access';
 
 export async function POST(request: Request) {
     try {
@@ -30,6 +31,16 @@ export async function POST(request: Request) {
 
         if (error || !data.session) {
             return NextResponse.json({ success: false, error: 'Invalid credentials' }, { status: 401 });
+        }
+
+        // Valid credentials are not enough - the account must be an admin.
+        // Sign it straight back out so no session cookie is left behind.
+        if (!isAdminUser(data.user)) {
+            await supabase.auth.signOut();
+            return NextResponse.json(
+                { success: false, error: 'This account does not have admin access.' },
+                { status: 403 }
+            );
         }
 
         clearRateLimit(key);

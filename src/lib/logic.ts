@@ -30,14 +30,20 @@ export function accruesDues(frequency: string | null | undefined): boolean {
 /**
  * Distinct paid months **inside the tracking window**.
  *
- * `calculateBakayaStatus` counts expected months from the tracking start, so
- * feeding it payments from before that date subtracted months it never counted
- * in the first place and under-reported the dues.
+ * `calculateBakayaStatus` counts expected months from the tracking start up to
+ * the current month, so only payments inside that same window may be counted:
+ *  - before the start, they subtracted months it never counted in the first
+ *    place and under-reported the dues;
+ *  - after the current month (paid in advance), they cancelled out an older
+ *    unpaid month - the card showed 0 due while the profile, which only lists
+ *    months up to today, still showed that month as DUE.
  */
 export function countTrackedPaidMonths(payments: Array<{ year: number; month: number }>): number {
+    const { year: currentYear, month: currentMonth } = getIstNow();
     const months = new Set<string>();
     for (const p of payments) {
         if (isBeforeTrackingStart(p.year, p.month)) continue;
+        if (p.year > currentYear || (p.year === currentYear && p.month > currentMonth)) continue;
         months.add(`${p.year}-${p.month}`);
     }
     return months.size;

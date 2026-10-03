@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
+import { isAdminUser } from '@/lib/admin-access';
 import { SyncControls } from '@/components/admin/SyncControls';
 import { redirect } from 'next/navigation';
 import { AdminNav } from '@/components/admin/AdminNav';
@@ -9,7 +10,7 @@ export default async function SyncPage() {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
 
-    if (!user) {
+    if (!isAdminUser(user)) {
         redirect('/admin/login');
     }
 

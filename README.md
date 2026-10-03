@@ -37,7 +37,10 @@ Modern Islamic community management system with Arabic aesthetics.
 3. **Supabase Setup**
    - Create `user-photos` bucket (Public)
    - Create folders: `small_image` and `large_image`
-   - Set up authentication
+   - Set up authentication, and **turn off public sign-ups**
+     (Authentication → Sign In / Providers → "Allow new users to sign up")
+   - Put the admin login emails in `ADMIN_EMAILS` - signing in alone does not
+     grant admin access
    - Run database migrations (if any)
 
 4. **Development**
@@ -67,6 +70,7 @@ Modern Islamic community management system with Arabic aesthetics.
 - `SYNC_SECRET_TOKEN`
 - `GOOGLE_SHEET_ID`
 - `GOOGLE_SERVICE_ACCOUNT_JSON`
+- `ADMIN_EMAILS` (comma-separated; without it nobody can use the admin panel)
 - `AZURE_TTS_KEY` (optional)
 - `AZURE_TTS_REGION` (optional)
 
