@@ -2,6 +2,7 @@
 
 import { appendToSheet, updateSheetRow, deleteSheetRow, verifySheetRow, sheetTimestamp, toSheetDate, readNormalizedRows, DateColumns } from '@/lib/sheets';
 import { requireAdmin } from '@/lib/auth';
+import { resolveHolder } from '@/lib/cash';
 import { revalidatePath } from 'next/cache';
 
 const SHEET = 'FormExpenses';
@@ -17,6 +18,15 @@ interface ExpenseRowGuard {
     description?: string;
     paymentDate?: string;
     amount?: string;
+}
+
+const HEADS = ['SaqlainiApp', 'Chanda'];
+
+/** Chanda-head expenses feed the admin cash balances too. */
+function revalidateExpenseViews() {
+    revalidatePath('/admin/form-expenses');
+    revalidatePath('/admin/cash');
+    revalidatePath('/total_monthly_history');
 }
 
 function assertRowUnchanged(rowIndex: number, expected: ExpenseRowGuard) {
@@ -50,6 +60,14 @@ export async function submitFormExpense(formData: FormData) {
         const formattedDate = toSheetDate(paymentDate);
         if (!formattedDate) return { success: false, error: 'Please enter a valid date.' };
 
+        if (!HEADS.includes(head)) return { success: false, error: 'Head must be SaqlainiApp or Chanda.' };
+
+        // A Chanda-head expense comes out of somebody's Chanda money (lib/cash.ts).
+        const resolved = head === 'Chanda'
+            ? await resolveHolder(formData.get('holder'), null)
+            : { holder: '' };
+        if ('error' in resolved) return { success: false, error: resolved.error };
+
         const values = [[
             // IST - the server clock is UTC, which put entries made between
             // midnight and 5:30 AM on the previous day.
@@ -59,11 +77,12 @@ export async function submitFormExpense(formData: FormData) {
             formattedDate,
             amount,
             remark,
-            head
+            head,
+            resolved.holder
         ]];
 
-        await appendToSheet(`${SHEET}!A:G`, values);
-        revalidatePath('/admin/form-expenses');
+        await appendToSheet(`${SHEET}!A:H`, values);
+        revalidateExpenseViews();
 
         return { success: true };
     } catch (error: any) {
@@ -78,7 +97,7 @@ export async function getFormExpenseEntries(page: number = 1, perPage: number = 
 
     try {
         // Raw values with dates as ISO - see payments.ts.
-        const data = await readNormalizedRows(`${SHEET}!A:G`, DATES);
+        const data = await readNormalizedRows(`${SHEET}!A:H`, DATES);
 
         if (!data || data.length <= 1) {
             return { entries: [], total: 0, page, perPage };
@@ -92,7 +111,8 @@ export async function getFormExpenseEntries(page: number = 1, perPage: number = 
             paymentDate: row[3] || '',
             amount: row[4] || '',
             remark: row[5] || '',
-            head: row[6] || ''
+            head: row[6] || '',
+            holder: row[7] || ''
         }));
 
         const total = entries.length;
@@ -128,19 +148,30 @@ export async function updateFormExpenseEntry(rowIndex: number, data: any, expect
         const paymentDate = toSheetDate(data?.paymentDate);
         if (!paymentDate) return { success: false, error: 'Please pick a valid date.' };
 
+        const head = String(data?.head ?? '').trim();
+        if (!HEADS.includes(head)) return { success: false, error: 'Head must be SaqlainiApp or Chanda.' };
+
+        // Judged by the entry's own timestamp: entries from before the opening
+        // cash balances must stay without a holder (see resolveHolder).
+        const resolved = head === 'Chanda'
+            ? await resolveHolder(data?.holder, String(expected.timestamp ?? ''))
+            : { holder: '' };
+        if ('error' in resolved) return { success: false, error: resolved.error };
+
         // From column B: the timestamp is never edited, so it is not rewritten.
-        const range = `${SHEET}!B${rowIndex + 1}:G${rowIndex + 1}`;
+        const range = `${SHEET}!B${rowIndex + 1}:H${rowIndex + 1}`;
         const values = [[
             name,
             data.description ?? '',
             paymentDate,
             amount,
             data.remark ?? '',
-            data.head ?? ''
+            head,
+            resolved.holder
         ]];
 
         await updateSheetRow(range, values);
-        revalidatePath('/admin/form-expenses');
+        revalidateExpenseViews();
         return { success: true };
     } catch (error: any) {
         console.error('Error updating entry:', error);
@@ -158,7 +189,7 @@ export async function deleteFormExpenseEntry(rowIndex: number, expected: Expense
         if (guardError) return { success: false, error: guardError };
 
         await deleteSheetRow(rowIndex, FORM_EXPENSES_SHEET_ID);
-        revalidatePath('/admin/form-expenses');
+        revalidateExpenseViews();
         return { success: true };
     } catch (error: any) {
         console.error('Error deleting entry:', error);

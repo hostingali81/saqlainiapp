@@ -130,13 +130,49 @@ export function normalizeCell(value: unknown, kind?: 'date' | 'datetime'): strin
     return typeof value === 'string' ? value.trim() : String(value);
 }
 
-/** Rows of `range` read raw and normalized (see normalizeCell). */
-export async function readNormalizedRows(range: string, dates: DateColumns): Promise<string[][]> {
-    const rows = await getSheetData(range, { raw: true });
+function normalizeRows(rows: any[][], dates: DateColumns): string[][] {
     return rows.map(row => {
         const width = Math.max(row.length, ...Object.keys(dates).map(c => Number(c) + 1));
         return Array.from({ length: width }, (_, i) => normalizeCell(row[i], dates[i]));
     });
+}
+
+/** Rows of `range` read raw and normalized (see normalizeCell). */
+export async function readNormalizedRows(range: string, dates: DateColumns): Promise<string[][]> {
+    return normalizeRows(await getSheetData(range, { raw: true }), dates);
+}
+
+/** Several ranges in ONE request, each read raw and normalized like readNormalizedRows. */
+export async function readNormalizedRanges(specs: Array<{ range: string; dates?: DateColumns }>): Promise<string[][][]> {
+    const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+    if (!spreadsheetId) {
+        throw new Error('Missing GOOGLE_SHEET_ID in .env.local');
+    }
+
+    const auth = await getAuthClient();
+    const sheets = google.sheets({ version: 'v4', auth: auth as any });
+    const response = await sheets.spreadsheets.values.batchGet({
+        spreadsheetId,
+        ranges: specs.map(s => s.range),
+        valueRenderOption: 'UNFORMATTED_VALUE',
+        dateTimeRenderOption: 'SERIAL_NUMBER',
+    });
+
+    return specs.map((s, i) => normalizeRows(response.data.valueRanges?.[i]?.values || [], s.dates || {}));
+}
+
+/** The numeric id of a tab (needed to delete rows), or null if there is no such tab. */
+export async function getSheetIdByTitle(title: string): Promise<number | null> {
+    const spreadsheetId = process.env.GOOGLE_SHEET_ID;
+    if (!spreadsheetId) {
+        throw new Error('Missing GOOGLE_SHEET_ID in .env.local');
+    }
+
+    const auth = await getAuthClient();
+    const sheets = google.sheets({ version: 'v4', auth: auth as any });
+    const meta = await sheets.spreadsheets.get({ spreadsheetId, fields: 'sheets(properties(title,sheetId))' });
+    const found = meta.data.sheets?.find(s => s.properties?.title === title);
+    return found?.properties?.sheetId ?? null;
 }
 
 /**

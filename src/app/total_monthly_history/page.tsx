@@ -1,6 +1,8 @@
 import { createClient } from '@/lib/supabase/server';
 import { fetchAllRows } from '@/lib/fetch-all';
 import { isAdminUser } from '@/lib/admin-access';
+import { readCashPosition, BANK_HOLDER, CashPosition } from '@/lib/cash';
+import { ChandaHoldersCard } from '@/components/admin/ChandaHoldersCard';
 import { MONTHLY_RATE } from '@/lib/logic';
 import { Coins, Wallet, Smartphone, HandCoins, FileText, ArrowUpCircle, TrendingUp, Calendar, Mic } from 'lucide-react';
 import { formatIndianCurrency } from '@/lib/utils';
@@ -60,6 +62,18 @@ async function MonthlyHistoryContent() {
     // Calculate totals
     const grandTotalCollection = totalPayment + totalChanda;
     const totalAvailableBalance = availableSaqlaini + availableChanda;
+
+    // Admin only: where the Chanda money physically is (kept in the Google
+    // Sheet, never in the public tables). Read only for admins, and a failure
+    // here must not break the public totals.
+    let cashPosition: CashPosition | null = null;
+    if (isAdminUser(adminUser)) {
+        try {
+            cashPosition = await readCashPosition();
+        } catch (error) {
+            console.error('Error reading cash position:', error);
+        }
+    }
 
     // 5. Get total due amount. Each member's own monthly rate is used rather
     // than a flat 125, so members on a different rate are not misreported.
@@ -155,6 +169,11 @@ async function MonthlyHistoryContent() {
                     </div>
                 </div>
             </div>
+
+            {/* ADMIN ONLY - who holds the Chanda money. Visitors never get this markup. */}
+            {cashPosition && (
+                <ChandaHoldersCard position={cashPosition} saqlainiAvailable={availableSaqlaini} bankHolder={BANK_HOLDER} />
+            )}
 
             {/* DUE AMOUNT CARD */}
             <div

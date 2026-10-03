@@ -3,6 +3,7 @@ import { isAdminUser } from '@/lib/admin-access';
 import { redirect } from 'next/navigation';
 import { FormExpensesClient } from '@/components/admin/FormExpensesClient';
 import { getSheetData } from '@/lib/sheets';
+import { readHolders } from '@/lib/cash';
 import { AdminNav } from '@/components/admin/AdminNav';
 
 export default async function FormExpensesPage() {
@@ -20,5 +21,9 @@ export default async function FormExpensesPage() {
 
     const uniqueNames = Array.from(new Set(names));
 
-    return <FormExpensesClient existingNames={uniqueNames} />;
+    // Who can hold the Chanda money. Without the CashHolders tab the form
+    // simply works as before (no holder field).
+    const holders = await readHolders().catch(() => ({ names: [] as string[], openingAsOf: null }));
+
+    return <FormExpensesClient existingNames={uniqueNames} holders={holders.names} openingAsOf={holders.openingAsOf} />;
 }

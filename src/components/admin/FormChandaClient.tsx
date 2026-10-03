@@ -8,14 +8,23 @@ import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Edit, Trash2 } from 'lucide-react';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { AdminNav } from '@/components/admin/AdminNav';
 import { formatDMY, formatDMYTime, istToday } from '@/lib/dates';
 
 interface FormChandaClientProps {
     existingNames: Array<{ name: string; nameHindi: string }>;
+    /** People (and the bank) who can hold Chanda money. */
+    holders: string[];
+    /** When the opening cash balances were taken (ISO), or null if not set up. */
+    openingAsOf: string | null;
 }
 
-export function FormChandaClient({ existingNames }: FormChandaClientProps) {
+export function FormChandaClient({ existingNames, holders, openingAsOf }: FormChandaClientProps) {
+    // Who has the money is tracked once opening balances exist (see lib/cash.ts).
+    const tracking = !!openingAsOf && holders.length > 0;
+    // Entries from before the openings are already counted in them - no holder.
+    const needsHolder = (entry: { timestamp?: string }) => tracking && String(entry.timestamp ?? '') > (openingAsOf ?? '');
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState('');
     const [entries, setEntries] = useState<any[]>([]);
@@ -30,7 +39,8 @@ export function FormChandaClient({ existingNames }: FormChandaClientProps) {
         nameHindi: '',
         paymentDate: istToday(),
         amount: '',
-        remarks: ''
+        remarks: '',
+        holder: ''
     });
 
     useEffect(() => {
@@ -46,7 +56,8 @@ export function FormChandaClient({ existingNames }: FormChandaClientProps) {
                     nameHindi: found.nameHindi,
                     paymentDate: istToday(),
                     amount: '',
-                    remarks: ''
+                    remarks: '',
+                    holder: ''
                 });
             }
         }
@@ -59,10 +70,15 @@ export function FormChandaClient({ existingNames }: FormChandaClientProps) {
 
     async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
         e.preventDefault();
+        if (tracking && !formData.holder) {
+            setMessage('✗ Error: Please choose "Paisa kiske paas gaya".');
+            return;
+        }
         setLoading(true);
         setMessage('');
 
         const submitData = new FormData();
+        submitData.append('holder', formData.holder);
         submitData.append('name', formData.name);
         submitData.append('nameHindi', formData.nameHindi);
         submitData.append('paymentDate', formData.paymentDate);
@@ -79,7 +95,8 @@ export function FormChandaClient({ existingNames }: FormChandaClientProps) {
                 nameHindi: '',
                 paymentDate: istToday(),
                 amount: '',
-                remarks: ''
+                remarks: '',
+                holder: ''
             });
             setSelectedName('');
             setShowNewEntryForm(false);
@@ -152,7 +169,8 @@ export function FormChandaClient({ existingNames }: FormChandaClientProps) {
                                 nameHindi: '',
                                 paymentDate: istToday(),
                                 amount: '',
-                                remarks: ''
+                                remarks: '',
+                                holder: ''
                             });
                         }}
                         showImages={false}
@@ -220,9 +238,24 @@ export function FormChandaClient({ existingNames }: FormChandaClientProps) {
                             </div>
                         </div>
 
+                        {tracking && (
+                            <div>
+                                <label className="block text-sm font-bold mb-2" style={{ color: '#4A3728' }}>Paisa kiske paas gaya? *</label>
+                                <Select value={formData.holder} onValueChange={(value) => setFormData({...formData, holder: value})}>
+                                    <SelectTrigger className="rounded-[10px]" style={{ background: 'white', border: '1px solid #E5D3AA' }}>
+                                        <SelectValue placeholder="Chuniye..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {holders.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                                <p className="text-[11px] mt-1" style={{ color: '#8B7355' }}>Account transfer hua ho to bank wala chuniye.</p>
+                            </div>
+                        )}
+
                         <div>
                             <label className="block text-sm font-bold mb-2" style={{ color: '#4A3728' }}>Remarks</label>
-                            <Textarea 
+                            <Textarea
                                 value={formData.remarks}
                                 onChange={(e) => setFormData({...formData, remarks: e.target.value})}
                                 className="rounded-[10px]" 
@@ -250,13 +283,14 @@ export function FormChandaClient({ existingNames }: FormChandaClientProps) {
                                 <th className="text-left p-3 text-sm font-bold" style={{ color: '#4A3728' }}>Date</th>
                                 <th className="text-left p-3 text-sm font-bold" style={{ color: '#4A3728' }}>Amount</th>
                                 <th className="text-left p-3 text-sm font-bold" style={{ color: '#4A3728' }}>Remarks</th>
+                                <th className="text-left p-3 text-sm font-bold" style={{ color: '#4A3728' }}>Kiske paas</th>
                                 <th className="text-left p-3 text-sm font-bold" style={{ color: '#4A3728' }}>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             {entries.length === 0 ? (
                                 <tr>
-                                    <td colSpan={7} className="text-center py-8 text-sm" style={{ color: '#165E4B' }}>No entries found.</td>
+                                    <td colSpan={8} className="text-center py-8 text-sm" style={{ color: '#165E4B' }}>No entries found.</td>
                                 </tr>
                             ) : entries.map((entry, idx) => (
                                 <tr key={idx} style={{ borderBottom: '1px solid #E5D3AA' }}>
@@ -266,6 +300,9 @@ export function FormChandaClient({ existingNames }: FormChandaClientProps) {
                                     <td className="p-3 text-xs" style={{ color: '#165E4B' }}>{formatDMY(entry.paymentDate)}</td>
                                     <td className="p-3 text-xs font-bold" style={{ color: '#059669' }}>₹{entry.amount}</td>
                                     <td className="p-3 text-xs" style={{ color: '#165E4B' }}>{entry.remarks}</td>
+                                    <td className="p-3 text-xs" style={{ color: '#4A3728' }}>
+                                        {entry.holder || (needsHolder(entry) ? <span className="text-red-600 font-bold">Chuna nahi</span> : '-')}
+                                    </td>
                                     <td className="p-3">
                                         <div className="flex gap-1">
                                             <Button size="sm" variant="ghost" onClick={() => handleEdit(entry)}><Edit className="h-4 w-4" /></Button>
@@ -308,6 +345,23 @@ export function FormChandaClient({ existingNames }: FormChandaClientProps) {
                             <label className="text-sm font-medium">Remarks</label>
                             <Textarea value={editData.remarks || ''} onChange={(e) => setEditData({...editData, remarks: e.target.value})} />
                         </div>
+                        {tracking && (needsHolder(editData) ? (
+                            <div>
+                                <label className="text-sm font-medium">Paisa kiske paas gaya?</label>
+                                <Select value={editData.holder || ''} onValueChange={(value) => setEditData({...editData, holder: value})}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Chuniye..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {holders.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        ) : (
+                            <p className="text-xs text-muted-foreground">
+                                Ye entry opening cash balance se pehle ki hai - opening mein shamil hai, isliye &quot;Kiske paas&quot; nahi chuna jata.
+                            </p>
+                        ))}
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setShowEditDialog(false)}>Cancel</Button>

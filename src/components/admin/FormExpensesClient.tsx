@@ -14,9 +14,17 @@ import { formatDMY, formatDMYTime, istToday } from '@/lib/dates';
 
 interface FormExpensesClientProps {
     existingNames: string[];
+    /** People (and the bank) who can hold Chanda money. */
+    holders: string[];
+    /** When the opening cash balances were taken (ISO), or null if not set up. */
+    openingAsOf: string | null;
 }
 
-export function FormExpensesClient({ existingNames }: FormExpensesClientProps) {
+export function FormExpensesClient({ existingNames, holders, openingAsOf }: FormExpensesClientProps) {
+    // Who has the Chanda money is tracked once opening balances exist (see lib/cash.ts).
+    const tracking = !!openingAsOf && holders.length > 0;
+    // Entries from before the openings are already counted in them - no holder.
+    const needsHolder = (entry: { timestamp?: string }) => tracking && String(entry.timestamp ?? '') > (openingAsOf ?? '');
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState('');
     const [entries, setEntries] = useState<any[]>([]);
@@ -32,7 +40,8 @@ export function FormExpensesClient({ existingNames }: FormExpensesClientProps) {
         paymentDate: istToday(),
         amount: '',
         remark: '',
-        head: 'SaqlainiApp'
+        head: 'SaqlainiApp',
+        holder: ''
     });
 
     useEffect(() => {
@@ -47,7 +56,8 @@ export function FormExpensesClient({ existingNames }: FormExpensesClientProps) {
                 paymentDate: istToday(),
                 amount: '',
                 remark: '',
-                head: 'SaqlainiApp'
+                head: 'SaqlainiApp',
+                holder: ''
             });
         }
     }, [selectedName, showNewEntryForm]);
@@ -59,10 +69,16 @@ export function FormExpensesClient({ existingNames }: FormExpensesClientProps) {
 
     async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
         e.preventDefault();
+        if (tracking && formData.head === 'Chanda' && !formData.holder) {
+            setMessage('✗ Error: Please choose "Kiske paas wale paise se kharch hua".');
+            return;
+        }
         setLoading(true);
         setMessage('');
 
         const submitData = new FormData();
+        // Only a Chanda-head expense comes out of someone's Chanda money.
+        submitData.append('holder', formData.head === 'Chanda' ? formData.holder : '');
         submitData.append('name', formData.name);
         submitData.append('description', formData.description);
         submitData.append('paymentDate', formData.paymentDate);
@@ -81,7 +97,8 @@ export function FormExpensesClient({ existingNames }: FormExpensesClientProps) {
                 paymentDate: istToday(),
                 amount: '',
                 remark: '',
-                head: 'SaqlainiApp'
+                head: 'SaqlainiApp',
+                holder: ''
             });
             setSelectedName('');
             setShowNewEntryForm(false);
@@ -155,7 +172,8 @@ export function FormExpensesClient({ existingNames }: FormExpensesClientProps) {
                                 paymentDate: istToday(),
                                 amount: '',
                                 remark: '',
-                                head: 'SaqlainiApp'
+                                head: 'SaqlainiApp',
+                                holder: ''
                             });
                         }}
                         showImages={false}
@@ -243,6 +261,20 @@ export function FormExpensesClient({ existingNames }: FormExpensesClientProps) {
                             </Select>
                         </div>
 
+                        {tracking && formData.head === 'Chanda' && (
+                            <div>
+                                <label className="block text-sm font-bold mb-2" style={{ color: '#4A3728' }}>Kiske paas wale paise se kharch hua? *</label>
+                                <Select value={formData.holder} onValueChange={(value) => setFormData({...formData, holder: value})}>
+                                    <SelectTrigger className="rounded-[10px]" style={{ background: 'white', border: '1px solid #E5D3AA' }}>
+                                        <SelectValue placeholder="Chuniye..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {holders.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+
                         <Button type="submit" disabled={loading} className="w-full rounded-[10px]" style={{ background: '#0D483B' }}>
                             {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...</> : 'Submit'}
                         </Button>
@@ -264,13 +296,14 @@ export function FormExpensesClient({ existingNames }: FormExpensesClientProps) {
                                 <th className="text-left p-3 text-sm font-bold" style={{ color: '#4A3728' }}>Amount</th>
                                 <th className="text-left p-3 text-sm font-bold" style={{ color: '#4A3728' }}>Remark</th>
                                 <th className="text-left p-3 text-sm font-bold" style={{ color: '#4A3728' }}>Head</th>
+                                <th className="text-left p-3 text-sm font-bold" style={{ color: '#4A3728' }}>Kiske paas se</th>
                                 <th className="text-left p-3 text-sm font-bold" style={{ color: '#4A3728' }}>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
                             {entries.length === 0 ? (
                                 <tr>
-                                    <td colSpan={8} className="text-center py-8 text-sm" style={{ color: '#165E4B' }}>No entries found.</td>
+                                    <td colSpan={9} className="text-center py-8 text-sm" style={{ color: '#165E4B' }}>No entries found.</td>
                                 </tr>
                             ) : entries.map((entry, idx) => (
                                 <tr key={idx} style={{ borderBottom: '1px solid #E5D3AA' }}>
@@ -281,6 +314,11 @@ export function FormExpensesClient({ existingNames }: FormExpensesClientProps) {
                                     <td className="p-3 text-xs font-bold" style={{ color: '#059669' }}>₹{entry.amount}</td>
                                     <td className="p-3 text-xs" style={{ color: '#165E4B' }}>{entry.remark}</td>
                                     <td className="p-3 text-xs font-bold" style={{ color: '#0D483B', background: '#E5D3AA' }}>{entry.head || 'N/A'}</td>
+                                    <td className="p-3 text-xs" style={{ color: '#4A3728' }}>
+                                        {entry.head !== 'Chanda'
+                                            ? '-'
+                                            : entry.holder || (needsHolder(entry) ? <span className="text-red-600 font-bold">Chuna nahi</span> : '-')}
+                                    </td>
                                     <td className="p-3">
                                         <div className="flex gap-1">
                                             <Button size="sm" variant="ghost" onClick={() => handleEdit(entry)}><Edit className="h-4 w-4" /></Button>
@@ -335,6 +373,23 @@ export function FormExpensesClient({ existingNames }: FormExpensesClientProps) {
                                 </SelectContent>
                             </Select>
                         </div>
+                        {tracking && editData.head === 'Chanda' && (needsHolder(editData) ? (
+                            <div>
+                                <label className="text-sm font-medium">Kiske paas wale paise se kharch hua?</label>
+                                <Select value={editData.holder || ''} onValueChange={(value) => setEditData({...editData, holder: value})}>
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Chuniye..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {holders.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        ) : (
+                            <p className="text-xs text-muted-foreground">
+                                Ye entry opening cash balance se pehle ki hai - opening mein shamil hai, isliye &quot;Kiske paas se&quot; nahi chuna jata.
+                            </p>
+                        ))}
                     </div>
                     <DialogFooter>
                         <Button variant="outline" onClick={() => setShowEditDialog(false)}>Cancel</Button>

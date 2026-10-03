@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { LogoutButton } from '@/components/LogoutButton';
-import { Home, FileText, DollarSign, RefreshCw, Camera } from 'lucide-react';
+import { Home, FileText, DollarSign, RefreshCw, Camera, Wallet } from 'lucide-react';
 
 export function AdminNav() {
     const pathname = usePathname();
@@ -32,6 +32,14 @@ export function AdminNav() {
                     <Button variant="outline" size="sm">
                         <DollarSign className="h-4 w-4 mr-2" />
                         Expenses
+                    </Button>
+                </Link>
+            )}
+            {pathname !== '/admin/cash' && (
+                <Link href="/admin/cash">
+                    <Button variant="outline" size="sm">
+                        <Wallet className="h-4 w-4 mr-2" />
+                        Cash
                     </Button>
                 </Link>
             )}

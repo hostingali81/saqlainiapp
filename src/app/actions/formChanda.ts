@@ -2,6 +2,7 @@
 
 import { appendToSheet, updateSheetRow, deleteSheetRow, verifySheetRow, sheetTimestamp, toSheetDate, readNormalizedRows, DateColumns } from '@/lib/sheets';
 import { requireAdmin } from '@/lib/auth';
+import { resolveHolder } from '@/lib/cash';
 import { revalidatePath } from 'next/cache';
 
 const SHEET = 'FormChanda';
@@ -17,6 +18,13 @@ interface ChandaRowGuard {
     nameHindi?: string;
     paymentDate?: string;
     amount?: string;
+}
+
+/** Chanda entries feed the admin cash balances too. */
+function revalidateChandaViews() {
+    revalidatePath('/admin/form-chanda');
+    revalidatePath('/admin/cash');
+    revalidatePath('/total_monthly_history');
 }
 
 function assertRowUnchanged(rowIndex: number, expected: ChandaRowGuard) {
@@ -49,6 +57,10 @@ export async function submitFormChanda(formData: FormData) {
         const formattedDate = toSheetDate(paymentDate);
         if (!formattedDate) return { success: false, error: 'Please enter a valid date.' };
 
+        // Who has the money now (admin-only cash tracking, see lib/cash.ts).
+        const resolved = await resolveHolder(formData.get('holder'), null);
+        if ('error' in resolved) return { success: false, error: resolved.error };
+
         const values = [[
             // IST - the server clock is UTC, which put entries made between
             // midnight and 5:30 AM on the previous day.
@@ -57,11 +69,12 @@ export async function submitFormChanda(formData: FormData) {
             nameHindi,
             formattedDate,
             amount,
-            remarks
+            remarks,
+            resolved.holder
         ]];
 
-        await appendToSheet(`${SHEET}!A:F`, values);
-        revalidatePath('/admin/form-chanda');
+        await appendToSheet(`${SHEET}!A:G`, values);
+        revalidateChandaViews();
 
         return { success: true };
     } catch (error: any) {
@@ -76,7 +89,7 @@ export async function getFormChandaEntries(page: number = 1, perPage: number = 1
 
     try {
         // Raw values with dates as ISO - see payments.ts.
-        const data = await readNormalizedRows(`${SHEET}!A:F`, DATES);
+        const data = await readNormalizedRows(`${SHEET}!A:G`, DATES);
 
         if (!data || data.length <= 1) {
             return { entries: [], total: 0, page, perPage };
@@ -89,7 +102,8 @@ export async function getFormChandaEntries(page: number = 1, perPage: number = 1
             nameHindi: row[2] || '',
             paymentDate: row[3] || '',
             amount: row[4] || '',
-            remarks: row[5] || ''
+            remarks: row[5] || '',
+            holder: row[6] || ''
         }));
 
         const total = entries.length;
@@ -125,18 +139,24 @@ export async function updateFormChandaEntry(rowIndex: number, data: any, expecte
         const paymentDate = toSheetDate(data?.paymentDate);
         if (!paymentDate) return { success: false, error: 'Please pick a valid date.' };
 
+        // Judged by the entry's own timestamp: entries from before the opening
+        // cash balances must stay without a holder (see resolveHolder).
+        const resolved = await resolveHolder(data?.holder, String(expected.timestamp ?? ''));
+        if ('error' in resolved) return { success: false, error: resolved.error };
+
         // From column B: the timestamp is never edited, so it is not rewritten.
-        const range = `${SHEET}!B${rowIndex + 1}:F${rowIndex + 1}`;
+        const range = `${SHEET}!B${rowIndex + 1}:G${rowIndex + 1}`;
         const values = [[
             name,
             data.nameHindi ?? '',
             paymentDate,
             amount,
-            data.remarks ?? ''
+            data.remarks ?? '',
+            resolved.holder
         ]];
 
         await updateSheetRow(range, values);
-        revalidatePath('/admin/form-chanda');
+        revalidateChandaViews();
         return { success: true };
     } catch (error: any) {
         console.error('Error updating entry:', error);
@@ -154,7 +174,7 @@ export async function deleteFormChandaEntry(rowIndex: number, expected: ChandaRo
         if (guardError) return { success: false, error: guardError };
 
         await deleteSheetRow(rowIndex, FORM_CHANDA_SHEET_ID);
-        revalidatePath('/admin/form-chanda');
+        revalidateChandaViews();
         return { success: true };
     } catch (error: any) {
         console.error('Error deleting entry:', error);
