@@ -37,22 +37,26 @@ const monthCell = (year: number, month: number) => `${year}-${pad(month)}-01`;
 export async function getUserProfile(userId: number) {
     const supabase = await createClient();
 
-    // Fetch User
-    const { data: userData, error: userError } = await supabase
-        .from('user_list')
-        .select('*')
-        .eq('id', userId)
-        .single();
+    // Member and payments in parallel - they used to be two back-to-back
+    // round trips on every profile open and every member picked in admin.
+    const [
+        { data: userData, error: userError },
+        { data: paymentData, error: paymentError },
+    ] = await Promise.all([
+        supabase
+            .from('user_list')
+            .select('*')
+            .eq('id', userId)
+            .single(),
+        supabase
+            .from('payment')
+            .select('*')
+            .eq('user_id', userId),
+    ]);
 
     if (userError || !userData) {
         return { error: 'User not found' };
     }
-
-    // Fetch Payments
-    const { data: paymentData, error: paymentError } = await supabase
-        .from('payment')
-        .select('*')
-        .eq('user_id', userId);
 
     if (paymentError) {
         return { error: 'Failed to fetch payments' };

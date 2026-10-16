@@ -3,7 +3,7 @@ import { fetchAllRows } from '@/lib/fetch-all';
 import { UserList } from '@/components/UserList';
 import { User } from '@/types';
 import { Suspense } from 'react';
-import { CardSkeleton } from '@/components/skeletons/CardSkeleton';
+import { HomeSkeleton } from '@/components/skeletons/HomeSkeleton';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -48,27 +48,7 @@ async function HomeContent() {
 export default function Home() {
   return (
     <main className="container max-w-md mx-auto p-4 h-screen flex flex-col bg-background">
-      <Suspense fallback={
-        <div className="flex flex-col h-full space-y-4">
-          <div className="h-10 rounded-lg relative overflow-hidden" style={{ background: 'rgba(198, 168, 105, 0.1)' }}>
-            <div className="absolute inset-0" style={{
-              background: 'linear-gradient(90deg, transparent, rgba(198, 168, 105, 0.3), transparent)',
-              backgroundSize: '200% 100%',
-              animation: 'shimmer 1.5s infinite linear'
-            }} />
-          </div>
-          <div className="h-5 w-32 rounded relative overflow-hidden" style={{ background: 'rgba(198, 168, 105, 0.1)' }}>
-            <div className="absolute inset-0" style={{
-              background: 'linear-gradient(90deg, transparent, rgba(198, 168, 105, 0.3), transparent)',
-              backgroundSize: '200% 100%',
-              animation: 'shimmer 1.5s infinite linear'
-            }} />
-          </div>
-          <div className="flex-1 overflow-y-auto space-y-2 pb-24">
-            <CardSkeleton count={6} />
-          </div>
-        </div>
-      }>
+      <Suspense fallback={<HomeSkeleton />}>
         <HomeContent />
       </Suspense>
     </main>

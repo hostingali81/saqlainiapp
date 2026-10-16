@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useCallback, useEffect, useMemo } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Modal, Notice, useConfirm } from '@/components/admin/ui';
 import { Button } from '@/components/ui/button';
 import { User } from '@/types';
-import { Camera, Upload, Trash2, ZoomIn, ZoomOut, X } from 'lucide-react';
+import { Upload, Trash2, ZoomIn, ZoomOut, Loader2 } from 'lucide-react';
 import Cropper from 'react-easy-crop';
 import { getCroppedImg } from '@/lib/cropImage';
 import { applyAvatarFallback, getPhotoUrl } from '@/lib/utils';
@@ -27,6 +27,7 @@ export function PhotoUploadModal({ user, isOpen, onClose, onSuccess }: PhotoUplo
     const [croppedAreaPixels, setCroppedAreaPixels] = useState<any>(null);
     const [uploading, setUploading] = useState(false);
     const [errorMessage, setErrorMessage] = useState('');
+    const [confirm, confirmDialog] = useConfirm();
 
     useEffect(() => {
         return () => {
@@ -106,7 +107,12 @@ export function PhotoUploadModal({ user, isOpen, onClose, onSuccess }: PhotoUplo
     const deletePhoto = async () => {
         if (!user) return;
 
-        if (!confirm('Are you sure you want to delete this photo?')) return;
+        const ok = await confirm({
+            title: 'Photo delete karein?',
+            message: <>{user.name} ki photo hata di jayegi.</>,
+            danger: true,
+        });
+        if (!ok) return;
 
         setUploading(true);
         setErrorMessage('');
@@ -153,82 +159,78 @@ export function PhotoUploadModal({ user, isOpen, onClose, onSuccess }: PhotoUplo
     if (!user) return null;
 
     return (
-        <Dialog open={isOpen} onOpenChange={handleClose}>
-            <DialogContent className="w-full sm:max-w-2xl max-h-[95vh] p-0 gap-0 overflow-hidden flex flex-col">
-                {/* Header */}
-                <div className="px-4 py-3 border-b flex items-center justify-between bg-gradient-to-r from-primary/5 to-primary/10">
-                    <div className="flex items-center gap-2">
-                        <Camera className="h-5 w-5 text-primary" />
-                        <h2 className="font-semibold text-lg">Photo Management</h2>
-                    </div>
-                    <button onClick={handleClose} className="p-1 hover:bg-gray-100 rounded-full">
-                        <X className="h-5 w-5" />
-                    </button>
-                </div>
-
-                {/* Content */}
-                <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-                    {errorMessage && (
-                        <div className="mb-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded text-sm">
-                            {errorMessage}
-                        </div>
-                    )}
+        <>
+            <Modal
+                open={isOpen}
+                onClose={handleClose}
+                busy={uploading}
+                size="lg"
+                title={selectedFile ? 'Photo crop karein' : 'Member photo'}
+                description={selectedFile ? 'Photo ko khinch kar sahi jagah layein, zoom se size set karein.' : `${user.name} · ${user.fname}`}
+                footer={selectedFile ? (
+                    <>
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                setSelectedFile(null);
+                                setPreviewUrl('');
+                            }}
+                            disabled={uploading}
+                            className="h-11"
+                        >
+                            Cancel
+                        </Button>
+                        <Button onClick={cropAndUpload} disabled={uploading} className="h-11">
+                            {uploading ? <><Loader2 className="h-4 w-4 animate-spin" /> Uploading...</> : 'Save photo'}
+                        </Button>
+                    </>
+                ) : undefined}
+            >
+                <div className="space-y-4">
+                    {errorMessage && <Notice tone="error">{errorMessage}</Notice>}
                     {!selectedFile ? (
-                        <div className="space-y-6">
-                            {/* User Info */}
-                            <div className="text-center">
-                                <h3 className="font-bold text-xl text-primary">{user.name}</h3>
-                                <p className="text-sm text-muted-foreground mt-1">{user.fname}</p>
-                            </div>
-
-                            {/* Current Photo */}
+                        <div className="space-y-5">
                             <div className="flex justify-center">
-                                <div className="relative">
-                                    <img
-                                        src={currentImageUrl}
-                                        alt={user.name}
-                                        className="w-56 h-56 sm:w-64 sm:h-64 rounded-full object-cover border-4 border-primary/20 shadow-lg"
-                                        onError={(e) => {
-                                            applyAvatarFallback(e.currentTarget, user.name, 300);
-                                        }}
-                                    />
-                                </div>
+                                <img
+                                    src={currentImageUrl}
+                                    alt={user.name}
+                                    className="h-48 w-48 rounded-full border-4 border-primary/20 object-cover shadow-lg sm:h-56 sm:w-56"
+                                    onError={(e) => {
+                                        applyAvatarFallback(e.currentTarget, user.name, 300);
+                                    }}
+                                />
                             </div>
 
-                            {/* Action Buttons */}
-                            <div className="space-y-3">
-                                <label className="block">
-                                    <input
-                                        type="file"
-                                        accept="image/*"
-                                        onChange={handleFileSelect}
-                                        className="hidden"
-                                        id="photo-upload-input"
-                                    />
-                                    <Button asChild className="w-full h-12 text-base" size="lg">
-                                        <label htmlFor="photo-upload-input" className="cursor-pointer">
-                                            <Upload className="h-5 w-5 mr-2" />
-                                            Select New Photo
-                                        </label>
-                                    </Button>
-                                </label>
+                            <div className="space-y-2.5">
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleFileSelect}
+                                    className="hidden"
+                                    id="photo-upload-input"
+                                />
+                                <Button asChild className="h-12 w-full rounded-lg text-base" size="lg">
+                                    <label htmlFor="photo-upload-input" className="cursor-pointer">
+                                        <Upload className="h-5 w-5" />
+                                        Nayi photo chuniye
+                                    </label>
+                                </Button>
 
                                 <Button
                                     onClick={deletePhoto}
                                     disabled={uploading}
                                     variant="destructive"
-                                    className="w-full h-12 text-base"
+                                    className="h-12 w-full rounded-lg text-base"
                                     size="lg"
                                 >
-                                    <Trash2 className="h-5 w-5 mr-2" />
-                                    Delete Photo
+                                    {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Trash2 className="h-5 w-5" />}
+                                    Photo hataein
                                 </Button>
                             </div>
                         </div>
                     ) : (
                         <div className="space-y-4">
-                            {/* Cropper */}
-                            <div className="relative w-full h-[50vh] sm:h-[60vh] bg-gray-900 rounded-lg overflow-hidden">
+                            <div className="relative h-[50vh] w-full overflow-hidden rounded-xl bg-gray-900 sm:h-[55vh]">
                                 <Cropper
                                     image={previewUrl}
                                     crop={crop}
@@ -241,14 +243,13 @@ export function PhotoUploadModal({ user, isOpen, onClose, onSuccess }: PhotoUplo
                                 />
                             </div>
 
-                            {/* Zoom Control */}
                             <div className="space-y-2">
-                                <label className="text-sm font-medium flex items-center justify-between">
-                                    <span>Zoom Level</span>
+                                <label className="flex items-center justify-between text-sm font-medium">
+                                    <span>Zoom</span>
                                     <span className="text-muted-foreground">{zoom.toFixed(1)}x</span>
                                 </label>
                                 <div className="flex items-center gap-3">
-                                    <ZoomOut className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                                    <ZoomOut className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
                                     <input
                                         type="range"
                                         value={zoom}
@@ -256,39 +257,16 @@ export function PhotoUploadModal({ user, isOpen, onClose, onSuccess }: PhotoUplo
                                         max={3}
                                         step={0.1}
                                         onChange={(e) => setZoom(Number(e.target.value))}
-                                        className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-primary"
+                                        className="h-2 flex-1 cursor-pointer appearance-none rounded-lg bg-gray-200 accent-primary"
                                     />
-                                    <ZoomIn className="h-5 w-5 text-muted-foreground flex-shrink-0" />
+                                    <ZoomIn className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
                                 </div>
                             </div>
                         </div>
                     )}
                 </div>
-
-                {/* Footer */}
-                {selectedFile && (
-                    <div className="px-4 py-3 border-t bg-gray-50 flex gap-3">
-                        <Button
-                            variant="outline"
-                            onClick={() => {
-                                setSelectedFile(null);
-                                setPreviewUrl('');
-                            }}
-                            disabled={uploading}
-                            className="flex-1 h-11"
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            onClick={cropAndUpload}
-                            disabled={uploading}
-                            className="flex-1 h-11"
-                        >
-                            {uploading ? 'Uploading...' : 'Save Photo'}
-                        </Button>
-                    </div>
-                )}
-            </DialogContent>
-        </Dialog>
+            </Modal>
+            {confirmDialog}
+        </>
     );
 }

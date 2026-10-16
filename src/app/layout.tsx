@@ -3,6 +3,7 @@ import { Amiri } from "next/font/google";
 import "./globals.css";
 import { BottomNav } from "@/components/BottomNav";
 import { Header } from "@/components/Header";
+import { PwaRegister } from "@/components/PwaRegister";
 
 const amiri = Amiri({
   weight: ['400', '700'],
@@ -20,6 +21,7 @@ export const metadata: Metadata = {
     statusBarStyle: "default",
     title: "Saqlaini App",
   },
+  formatDetection: { telephone: false },
   icons: {
     icon: [
       { url: "/icons/favicon.ico" },
@@ -34,6 +36,8 @@ export const viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 5,
+  // Lets the bottom bar and header respect notches / gesture bars (see safe-area use in BottomNav / Header).
+  viewportFit: 'cover' as const,
   themeColor: '#145948',
 };
 
@@ -43,7 +47,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" dir="ltr">
+    // data-scroll-behavior: page changes jump straight to the top (as an app
+    // does) instead of animating there - Next 16 only does that when asked.
+    <html lang="en" dir="ltr" data-scroll-behavior="smooth">
       <head>
         <link rel="preconnect" href="https://ui-avatars.com" />
         <link rel="dns-prefetch" href="https://ui-avatars.com" />
@@ -67,6 +73,7 @@ export default function RootLayout({
       <body
         className={`${amiri.variable} font-sans antialiased`}
       >
+        <PwaRegister />
         <Header />
         {children}
         <BottomNav />

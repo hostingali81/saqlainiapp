@@ -86,7 +86,6 @@ export function UserCard({ user, style, index = 0 }: UserCardProps) {
                                 background: isDue
                                     ? 'linear-gradient(135deg, rgba(13, 72, 59, 0.9), rgba(22, 94, 75, 0.9))'
                                     : 'linear-gradient(135deg, rgba(45, 106, 79, 0.9), rgba(52, 121, 88, 0.9))',
-                                backdropFilter: 'blur(8px)',
                                 border: '1px solid rgba(198, 168, 105, 0.4)'
                             }}
                         >
@@ -101,8 +100,7 @@ export function UserCard({ user, style, index = 0 }: UserCardProps) {
                                     className="h-[45px] w-[45px] rounded-full smooth-hover gold-glow"
                                     style={{
                                         background: 'linear-gradient(135deg, rgba(13, 72, 59, 0.95), rgba(22, 94, 75, 0.95))',
-                                        backdropFilter: 'blur(8px)',
-                                        border: '2px solid rgba(198, 168, 105, 0.5)',
+                                                border: '2px solid rgba(198, 168, 105, 0.5)',
                                         color: '#FFF8E7'
                                     }}
                                     onClick={(e) => {
@@ -119,8 +117,7 @@ export function UserCard({ user, style, index = 0 }: UserCardProps) {
                                     className="h-[45px] w-[45px] rounded-full"
                                     style={{
                                         background: 'rgba(200, 200, 200, 0.5)',
-                                        backdropFilter: 'blur(8px)',
-                                        color: '#999'
+                                                color: '#999'
                                     }}
                                 >
                                     <Phone className="h-5 w-5" />

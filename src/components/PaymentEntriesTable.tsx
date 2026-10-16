@@ -3,11 +3,12 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Chip, EmptyState, Field, IconButton, ListSkeleton, Modal, Notice, Panel, inputCls, useConfirm } from '@/components/admin/ui';
 import { getPaymentEntries, updatePaymentEntry, deletePaymentEntry } from '@/app/actions/payments';
 import { PaymentEntryRow } from '@/types';
-import { Pencil, Trash2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Pencil, Trash2, ChevronLeft, ChevronRight, Loader2, ReceiptText, Inbox } from 'lucide-react';
 import { formatDMY, formatMonthYY } from '@/lib/dates';
+import { formatIndianCurrency } from '@/lib/utils';
 
 /** Entry dates arrive as ISO (see getPaymentEntries) -> DD/MM/YYYY. */
 function formatDate(value: string) {
@@ -45,6 +46,7 @@ export function PaymentEntriesTable({ refreshTrigger, onDataChanged }: {
     const [editError, setEditError] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
     const [showEditDialog, setShowEditDialog] = useState(false);
+    const [confirm, confirmDialog] = useConfirm();
 
     const loadEntries = useCallback(async () => {
         setLoading(true);
@@ -104,7 +106,12 @@ export function PaymentEntriesTable({ refreshTrigger, onDataChanged }: {
 
     const handleDelete = async (entry: PaymentEntryRow) => {
         if (deletingRow !== null) return;
-        if (!confirm(`Delete entry for ${entry.name}?`)) return;
+        const ok = await confirm({
+            title: 'Ye payment entry delete karein?',
+            message: <><strong className="text-foreground">{entry.name}</strong> · ₹{entry.amount}{entry.monthName ? ` · ${formatMonthYY(entry.monthName)}` : ''}. Member ke due months bhi dobara sync honge.</>,
+            danger: true,
+        });
+        if (!ok) return;
 
         setError(null);
         setWarning(null);
@@ -125,181 +132,127 @@ export function PaymentEntriesTable({ refreshTrigger, onDataChanged }: {
 
     return (
         <>
-            <div className="mt-8">
-                <h2 className="text-xl font-bold mb-4">Recent Payment Entries</h2>
-
+            <Panel
+                title="Recent payment entries"
+                description={loading || total === 0 ? undefined : `${total} entries in total`}
+                icon={ReceiptText}
+                flush
+            >
                 {error && (
-                    <div className="mb-3 p-3 rounded-md bg-red-100 text-red-800 text-sm flex items-center justify-between gap-3">
-                        <span>{error}</span>
-                        <Button size="sm" variant="outline" onClick={loadEntries}>Refresh</Button>
+                    <div className="border-b border-border/60 p-3">
+                        <Notice tone="error">
+                            <div className="flex items-center justify-between gap-3">
+                                <span>{error}</span>
+                                <Button size="sm" variant="outline" onClick={loadEntries}>Refresh</Button>
+                            </div>
+                        </Notice>
                     </div>
                 )}
 
                 {warning && (
-                    <div className="mb-3 p-3 rounded-md bg-amber-100 text-amber-900 text-sm">⚠ {warning}</div>
+                    <div className="border-b border-border/60 p-3">
+                        <Notice tone="warning" onClose={() => setWarning(null)}>{warning}</Notice>
+                    </div>
                 )}
 
-                {loading ? (
-                    <div className="text-center p-4">Loading...</div>
+                {loading && entries.length === 0 ? (
+                    <ListSkeleton rows={5} />
                 ) : entries.length === 0 ? (
-                    <div className="text-center p-4 text-muted-foreground">No entries found</div>
+                    <EmptyState icon={Inbox} title="Abhi koi entry nahi" description="Payment darj hote hi yahan dikhegi." />
                 ) : (
                     <>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm border-collapse">
-                                <thead>
-                                    <tr className="border-b">
-                                        <th className="text-left p-2 whitespace-nowrap">Name</th>
-                                        <th className="text-left p-2">Date</th>
-                                        <th className="text-left p-2">Amount</th>
-                                        <th className="text-left p-2">Month</th>
-                                        <th className="text-left p-2">Remarks</th>
-                                        <th className="text-right p-2">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {entries.map((entry) => (
-                                        <tr key={entry.rowIndex} className="border-b hover:bg-muted/50">
-                                            <td className="p-2 whitespace-nowrap">{entry.name}</td>
-                                            <td className="p-2">{formatDate(entry.paymentDate)}</td>
-                                            <td className="p-2">₹{entry.amount}</td>
-                                            <td className="p-2">{entry.monthName ? formatMonthYY(entry.monthName) : '-'}</td>
-                                            <td className="p-2 text-xs text-muted-foreground">{entry.remarks || '-'}</td>
-                                            <td className="p-2 text-right">
-                                                <div className="flex gap-1 justify-end">
-                                                    <Button
-                                                        size="sm"
-                                                        variant="ghost"
-                                                        onClick={() => handleEdit(entry)}
-                                                    >
-                                                        <Pencil className="h-3 w-3" />
-                                                    </Button>
-                                                    <Button
-                                                        size="sm"
-                                                        variant="ghost"
-                                                        onClick={() => handleDelete(entry)}
-                                                        disabled={deletingRow !== null}
-                                                    >
-                                                        <Trash2 className={`h-3 w-3 text-red-600 ${deletingRow === entry.rowIndex ? 'animate-pulse' : ''}`} />
-                                                    </Button>
-                                                </div>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
+                        <ul className={`divide-y divide-border/60 transition-opacity ${loading ? 'opacity-50' : ''}`} aria-busy={loading}>
+                            {entries.map((entry) => (
+                                <li key={entry.rowIndex} className="flex items-start gap-3 px-4 py-3.5 sm:px-5">
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                            <span className="text-sm font-semibold text-foreground">{entry.name}</span>
+                                            {entry.monthName && <Chip tone="green">{formatMonthYY(entry.monthName)}</Chip>}
+                                        </div>
+                                        <div className="mt-0.5 text-xs text-muted-foreground">{formatDate(entry.paymentDate)}</div>
+                                        {entry.remarks && <p className="mt-1 text-xs text-foreground/70">{entry.remarks}</p>}
+                                    </div>
+                                    <div className="flex shrink-0 flex-col items-end gap-1">
+                                        <span className="text-base font-bold text-emerald-700">₹{formatIndianCurrency(Number(entry.amount) || 0)}</span>
+                                        <div className="-mr-2 flex">
+                                            <IconButton label={`Edit ${entry.name}`} onClick={() => handleEdit(entry)}>
+                                                <Pencil className="h-4 w-4" />
+                                            </IconButton>
+                                            <IconButton label={`Delete ${entry.name}`} tone="danger" onClick={() => handleDelete(entry)} disabled={deletingRow !== null}>
+                                                {deletingRow === entry.rowIndex ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                                            </IconButton>
+                                        </div>
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
 
                         {/* Pagination */}
-                        <div className="flex items-center justify-between mt-4">
-                            <div className="text-sm text-muted-foreground">
-                                Showing {((page - 1) * perPage) + 1} to {Math.min(page * perPage, total)} of {total}
+                        <div className="flex items-center justify-between gap-3 border-t border-border/60 bg-muted/30 px-4 py-3 sm:px-5">
+                            <div className="text-xs text-muted-foreground">
+                                {((page - 1) * perPage) + 1}–{Math.min(page * perPage, total)} of {total}
                             </div>
-                            <div className="flex gap-2">
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    disabled={page <= 1}
-                                    onClick={() => setPage(page - 1)}
-                                >
+                            <div className="flex items-center gap-1.5">
+                                <Button size="icon-sm" variant="outline" aria-label="Previous page" disabled={page <= 1 || loading} onClick={() => setPage(page - 1)}>
                                     <ChevronLeft className="h-4 w-4" />
                                 </Button>
-                                <span className="px-3 py-1 text-sm">
-                                    {page} / {totalPages}
-                                </span>
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    disabled={page >= totalPages}
-                                    onClick={() => setPage(page + 1)}
-                                >
+                                <span className="min-w-14 text-center text-xs font-medium">{page} / {totalPages}</span>
+                                <Button size="icon-sm" variant="outline" aria-label="Next page" disabled={page >= totalPages || loading} onClick={() => setPage(page + 1)}>
                                     <ChevronRight className="h-4 w-4" />
                                 </Button>
                             </div>
                         </div>
                     </>
                 )}
-            </div>
+            </Panel>
 
-            {/* Edit Dialog */}
-            <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-                <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[80vh] flex flex-col">
-                    <DialogHeader>
-                        <DialogTitle>Edit Payment Entry</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-3 overflow-y-auto flex-1 pr-2">
-                        {editError && (
-                            <div className="p-3 rounded-md bg-red-100 text-red-800 text-sm">{editError}</div>
-                        )}
-                        <div>
-                            <label className="text-sm font-medium">Name</label>
-                            <Input
-                                value={editData.name || ''}
-                                onChange={(e) => setEditData({ ...editData, name: e.target.value })}
-                            />
-                        </div>
-                        <div>
-                            <label className="text-sm font-medium">Amount</label>
-                            <Input
-                                type="number"
-                                min={1}
-                                value={editData.amount || ''}
-                                onChange={(e) => setEditData({ ...editData, amount: e.target.value })}
-                            />
-                        </div>
-                        <div>
-                            <label className="text-sm font-medium">Payment Date</label>
-                            {/* A date picker works in ISO, which is exactly what the
-                                server expects - no typed text to misread. */}
-                            <Input
-                                type="date"
-                                value={editData.paymentDate || ''}
-                                onChange={(e) => setEditData({ ...editData, paymentDate: e.target.value })}
-                            />
-                        </div>
-                        <div>
-                            <label className="text-sm font-medium">Month (No.)</label>
-                            <Input
-                                type="number"
-                                min={1}
-                                max={12}
-                                value={editData.month || ''}
-                                onChange={(e) => setEditData({ ...editData, month: e.target.value })}
-                            />
-                        </div>
-                        <div>
-                            <label className="text-sm font-medium">Year</label>
-                            <Input
-                                type="number"
-                                value={editData.year || ''}
-                                onChange={(e) => setEditData({ ...editData, year: e.target.value })}
-                            />
-                        </div>
-                        <div>
-                            <label className="text-sm font-medium">Remarks</label>
-                            <Input
-                                value={editData.remarks || ''}
-                                onChange={(e) => setEditData({ ...editData, remarks: e.target.value })}
-                            />
-                        </div>
-                        <div className="pb-2">
-                            <label className="text-sm font-medium">Phone Number</label>
-                            <Input
-                                value={editData.phone || ''}
-                                onChange={(e) => setEditData({ ...editData, phone: e.target.value })}
-                            />
-                        </div>
+            {/* Edit */}
+            <Modal
+                open={showEditDialog}
+                onClose={() => setShowEditDialog(false)}
+                busy={saving}
+                title="Payment entry edit karein"
+                description={editEntry ? `${editEntry.name} · ${formatDate(editEntry.paymentDate)}` : undefined}
+                footer={
+                    <>
+                        <Button variant="outline" onClick={() => setShowEditDialog(false)} disabled={saving}>Cancel</Button>
+                        <Button onClick={handleSaveEdit} disabled={saving}>
+                            {saving ? <><Loader2 className="h-4 w-4 animate-spin" /> Saving...</> : 'Save changes'}
+                        </Button>
+                    </>
+                }
+            >
+                <div className="space-y-4">
+                    {editError && <Notice tone="error">{editError}</Notice>}
+                    <Field label="Name">
+                        <Input className={inputCls} value={editData.name || ''} onChange={(e) => setEditData({ ...editData, name: e.target.value })} />
+                    </Field>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <Field label="Amount (₹)">
+                            <Input className={inputCls} type="number" inputMode="numeric" min={1} value={editData.amount || ''} onChange={(e) => setEditData({ ...editData, amount: e.target.value })} />
+                        </Field>
+                        {/* A date picker works in ISO, which is exactly what the
+                            server expects - no typed text to misread. */}
+                        <Field label="Payment date">
+                            <Input className={inputCls} type="date" value={editData.paymentDate || ''} onChange={(e) => setEditData({ ...editData, paymentDate: e.target.value })} />
+                        </Field>
+                        <Field label="Month (1-12)">
+                            <Input className={inputCls} type="number" inputMode="numeric" min={1} max={12} value={editData.month || ''} onChange={(e) => setEditData({ ...editData, month: e.target.value })} />
+                        </Field>
+                        <Field label="Year">
+                            <Input className={inputCls} type="number" inputMode="numeric" value={editData.year || ''} onChange={(e) => setEditData({ ...editData, year: e.target.value })} />
+                        </Field>
                     </div>
-                    <DialogFooter className="flex-row gap-2 pt-4">
-                        <Button variant="outline" onClick={() => setShowEditDialog(false)} className="flex-1" disabled={saving}>
-                            Cancel
-                        </Button>
-                        <Button onClick={handleSaveEdit} className="flex-1" disabled={saving}>
-                            {saving ? 'Saving...' : 'Save'}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                    <Field label="Remarks">
+                        <Input className={inputCls} value={editData.remarks || ''} onChange={(e) => setEditData({ ...editData, remarks: e.target.value })} />
+                    </Field>
+                    <Field label="Phone number">
+                        <Input className={inputCls} type="tel" inputMode="tel" value={editData.phone || ''} onChange={(e) => setEditData({ ...editData, phone: e.target.value })} />
+                    </Field>
+                </div>
+            </Modal>
+
+            {confirmDialog}
         </>
     );
 }

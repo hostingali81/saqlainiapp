@@ -2,10 +2,10 @@
 
 import { useState } from 'react';
 import { User } from '@/types';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { SearchableSelect } from '@/components/ui/searchable-select';
-import { Camera, Trash2 } from 'lucide-react';
+import { Camera, Loader2, Trash2 } from 'lucide-react';
+import { Field, Notice, Panel, useConfirm } from '@/components/admin/ui';
 import { PhotoUploadModal } from '@/components/PhotoUploadModal';
 import { applyAvatarFallback, getPhotoUrl } from '@/lib/utils';
 
@@ -19,6 +19,8 @@ export function PhotoManagement({ users }: PhotoManagementProps) {
     const [imageKey, setImageKey] = useState(0);
     const [successMessage, setSuccessMessage] = useState('');
     const [errorMessage, setErrorMessage] = useState('');
+    const [deleting, setDeleting] = useState(false);
+    const [confirm, confirmDialog] = useConfirm();
 
     const selectedUser = users.find(u => u.id.toString() === selectedUserId);
 
@@ -38,9 +40,15 @@ export function PhotoManagement({ users }: PhotoManagementProps) {
     const handleDelete = async () => {
         if (!selectedUser) return;
 
-        if (!confirm('Are you sure you want to delete this photo?')) return;
+        const ok = await confirm({
+            title: 'Photo delete karein?',
+            message: <>{selectedUser.name} ki photo hata di jayegi.</>,
+            danger: true,
+        });
+        if (!ok) return;
 
         setErrorMessage('');
+        setDeleting(true);
 
         try {
             const response = await fetch('/api/admin/delete-photo', {
@@ -61,89 +69,58 @@ export function PhotoManagement({ users }: PhotoManagementProps) {
         } catch (error) {
             console.error('Delete error:', error);
             setErrorMessage('Could not reach the server. Please try again.');
+        } finally {
+            setDeleting(false);
         }
     };
 
     return (
         <>
-            <Card className="w-full max-w-lg mx-auto border-t-4 border-t-primary">
-                <CardHeader>
-                    <CardTitle>Photo Management</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                    {successMessage && (
-                        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative">
-                            {successMessage}
+            <Panel title="Member photo" description="Member chuniye, phir photo badlein ya hataein." icon={Camera} bodyClassName="space-y-4">
+                {successMessage && <Notice tone="success">{successMessage}</Notice>}
+                {errorMessage && <Notice tone="error" onClose={() => setErrorMessage('')}>{errorMessage}</Notice>}
+
+                <Field label="Member">
+                    <SearchableSelect
+                        options={userOptions}
+                        value={selectedUserId}
+                        onChange={setSelectedUserId}
+                        placeholder="Search and select user..."
+                    />
+                </Field>
+
+                {selectedUser && (
+                    <div className="space-y-4 pt-1">
+                        <div className="flex flex-col items-center text-center">
+                            <img
+                                key={imageKey}
+                                src={currentImageUrl}
+                                alt={selectedUser.name}
+                                className="h-40 w-40 rounded-full border-4 border-border object-cover shadow-sm"
+                                loading="eager"
+                                onError={(e) => {
+                                    applyAvatarFallback(e.currentTarget, selectedUser.name, 300);
+                                }}
+                            />
+                            <p className="mt-3 text-base font-semibold">{selectedUser.name}</p>
+                            <p className="text-xs text-muted-foreground">{selectedUser.fname}</p>
                         </div>
-                    )}
 
-                    {errorMessage && (
-                        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative">
-                            {errorMessage}
-                        </div>
-                    )}
-
-                    {/* Searchable User Select */}
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium">Select User</label>
-                        <SearchableSelect
-                            options={userOptions}
-                            value={selectedUserId}
-                            onChange={setSelectedUserId}
-                            placeholder="Search and select user..."
-                        />
-                    </div>
-
-                    {/* Current Photo Display */}
-                    {selectedUser && (
-                        <div className="space-y-4">
-                            <div className="text-center">
-                                <p className="text-sm font-medium mb-2">Current Photo</p>
-                                <div className="flex justify-center">
-                                    <img
-                                        key={imageKey}
-                                        src={currentImageUrl}
-                                        alt={selectedUser.name}
-                                        className="w-40 h-40 rounded-full object-cover border-4 border-gray-200"
-                                        loading="eager"
-                                        onError={(e) => {
-                                            applyAvatarFallback(e.currentTarget, selectedUser.name, 300);
-                                        }}
-                                    />
-                                </div>
-                                <p className="text-sm text-muted-foreground mt-2">
-                                    {selectedUser.name}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                    {selectedUser.fname}
-                                </p>
-                            </div>
-
-                            {/* Action Buttons */}
-                            <div className="flex gap-2">
-                                <Button
-                                    onClick={() => setPhotoModalOpen(true)}
-                                    className="flex-1"
-                                    variant="default"
-                                >
-                                    <Camera className="h-4 w-4 mr-2" />
-                                    Change Photo
+                        <div className="flex flex-col gap-2 sm:flex-row">
+                            <Button onClick={() => setPhotoModalOpen(true)} size="lg" className="flex-1 rounded-lg">
+                                <Camera className="h-4 w-4" />
+                                Photo badlein
+                            </Button>
+                            {selectedUser.hasImage && (
+                                <Button onClick={handleDelete} disabled={deleting} variant="destructive" size="lg" className="flex-1 rounded-lg">
+                                    {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                                    Photo hataein
                                 </Button>
-                                {selectedUser.hasImage && (
-                                    <Button
-                                        onClick={handleDelete}
-                                        variant="destructive"
-                                        className="flex-1"
-                                    >
-                                        <Trash2 className="h-4 w-4 mr-2" />
-                                        Delete Photo
-                                    </Button>
-                                )}
-                            </div>
+                            )}
                         </div>
-                    )}
-                </CardContent>
-            </Card>
+                    </div>
+                )}
+            </Panel>
 
             {/* Photo Upload Modal */}
             <PhotoUploadModal
@@ -157,6 +134,7 @@ export function PhotoManagement({ users }: PhotoManagementProps) {
                     setTimeout(() => setSuccessMessage(''), 3000);
                 }}
             />
+        {confirmDialog}
         </>
     );
 }

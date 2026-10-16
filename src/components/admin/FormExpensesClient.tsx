@@ -5,12 +5,12 @@ import { submitFormExpense, getFormExpenseEntries, updateFormExpenseEntry, delet
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Edit, Trash2 } from 'lucide-react';
+import { Pencil, Trash2, Receipt, Inbox, Loader2 } from 'lucide-react';
 import { SearchableSelect } from '@/components/ui/searchable-select';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { AdminNav } from '@/components/admin/AdminNav';
+import { Chip, EmptyState, Field, IconButton, Modal, Notice, Panel, SubmitButton, inputCls, selectCls, textareaCls, useConfirm } from '@/components/admin/ui';
 import { formatDMY, formatDMYTime, istToday } from '@/lib/dates';
+import { formatIndianCurrency } from '@/lib/utils';
 
 interface FormExpensesClientProps {
     existingNames: string[];
@@ -18,47 +18,42 @@ interface FormExpensesClientProps {
     holders: string[];
     /** When the opening cash balances were taken (ISO), or null if not set up. */
     openingAsOf: string | null;
+    /** First page of entries, read together with the page on the server. */
+    initialEntries: any[];
 }
 
-export function FormExpensesClient({ existingNames, holders, openingAsOf }: FormExpensesClientProps) {
+const emptyForm = () => ({
+    name: '',
+    description: '',
+    paymentDate: istToday(),
+    amount: '',
+    remark: '',
+    head: 'SaqlainiApp',
+    holder: ''
+});
+
+export function FormExpensesClient({ existingNames, holders, openingAsOf, initialEntries }: FormExpensesClientProps) {
     // Who has the Chanda money is tracked once opening balances exist (see lib/cash.ts).
     const tracking = !!openingAsOf && holders.length > 0;
     // Entries from before the openings are already counted in them - no holder.
     const needsHolder = (entry: { timestamp?: string }) => tracking && String(entry.timestamp ?? '') > (openingAsOf ?? '');
     const [loading, setLoading] = useState(false);
-    const [message, setMessage] = useState('');
-    const [entries, setEntries] = useState<any[]>([]);
+    const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
+    const [entries, setEntries] = useState<any[]>(initialEntries);
     const [editingRow, setEditingRow] = useState<any | null>(null);
     const [editData, setEditData] = useState<any>({});
     const [showEditDialog, setShowEditDialog] = useState(false);
     const [editMessage, setEditMessage] = useState('');
+    const [saving, setSaving] = useState(false);
+    const [deletingRow, setDeletingRow] = useState<number | null>(null);
     const [selectedName, setSelectedName] = useState('');
     const [showNewEntryForm, setShowNewEntryForm] = useState(false);
-    const [formData, setFormData] = useState({
-        name: '',
-        description: '',
-        paymentDate: istToday(),
-        amount: '',
-        remark: '',
-        head: 'SaqlainiApp',
-        holder: ''
-    });
-
-    useEffect(() => {
-        loadEntries();
-    }, []);
+    const [formData, setFormData] = useState(emptyForm);
+    const [confirm, confirmDialog] = useConfirm();
 
     useEffect(() => {
         if (selectedName && !showNewEntryForm) {
-            setFormData({
-                name: selectedName,
-                description: '',
-                paymentDate: istToday(),
-                amount: '',
-                remark: '',
-                head: 'SaqlainiApp',
-                holder: ''
-            });
+            setFormData({ ...emptyForm(), name: selectedName });
         }
     }, [selectedName, showNewEntryForm]);
 
@@ -70,11 +65,11 @@ export function FormExpensesClient({ existingNames, holders, openingAsOf }: Form
     async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
         e.preventDefault();
         if (tracking && formData.head === 'Chanda' && !formData.holder) {
-            setMessage('✗ Error: Please choose "Kiske paas wale paise se kharch hua".');
+            setMessage({ ok: false, text: 'Please choose "Kiske paas wale paise se kharch hua".' });
             return;
         }
         setLoading(true);
-        setMessage('');
+        setMessage(null);
 
         const submitData = new FormData();
         // Only a Chanda-head expense comes out of someone's Chanda money.
@@ -90,31 +85,26 @@ export function FormExpensesClient({ existingNames, holders, openingAsOf }: Form
 
         setLoading(false);
         if (result.success) {
-            setMessage('✓ Entry added successfully!');
-            setFormData({
-                name: '',
-                description: '',
-                paymentDate: istToday(),
-                amount: '',
-                remark: '',
-                head: 'SaqlainiApp',
-                holder: ''
-            });
+            setMessage({ ok: true, text: 'Entry add ho gayi.' });
+            setFormData(emptyForm());
             setSelectedName('');
             setShowNewEntryForm(false);
             loadEntries();
         } else {
-            setMessage('✗ Error: ' + result.error);
+            setMessage({ ok: false, text: result.error || 'Could not add the entry.' });
         }
     }
 
     async function handleUpdate() {
         if (!editingRow) return;
         setEditMessage('');
+        setSaving(true);
         const result = await updateFormExpenseEntry(editingRow.rowIndex, editData, editingRow);
+        setSaving(false);
         if (result.success) {
             setShowEditDialog(false);
             setEditingRow(null);
+            setMessage({ ok: true, text: 'Entry update ho gayi.' });
             loadEntries();
         } else {
             setEditMessage(result.error || 'Could not save the entry.');
@@ -130,13 +120,22 @@ export function FormExpensesClient({ existingNames, holders, openingAsOf }: Form
 
     // The whole entry goes along so the server can confirm the row has not moved.
     async function handleDelete(entry: any) {
-        if (!confirm('Delete this entry?')) return;
-        setMessage('');
+        if (deletingRow !== null) return;
+        const ok = await confirm({
+            title: 'Ye entry delete karein?',
+            message: <><strong className="text-foreground">{entry.name}</strong> · ₹{entry.amount}{entry.paymentDate ? ` · ${formatDMY(entry.paymentDate)}` : ''}. Ye wapas nahi aayegi.</>,
+            danger: true,
+        });
+        if (!ok) return;
+        setMessage(null);
+        setDeletingRow(entry.rowIndex);
         const result = await deleteFormExpenseEntry(entry.rowIndex, entry);
+        setDeletingRow(null);
         if (result.success) {
+            setMessage({ ok: true, text: 'Entry delete ho gayi.' });
             loadEntries();
         } else {
-            setMessage('✗ Error: ' + (result.error || 'Could not delete the entry.'));
+            setMessage({ ok: false, text: result.error || 'Could not delete the entry.' });
         }
     }
 
@@ -145,258 +144,202 @@ export function FormExpensesClient({ existingNames, holders, openingAsOf }: Form
         label: n
     }));
 
+    const formOpen = showNewEntryForm || !!selectedName;
+
+    const headSelect = (value: string, onChange: (v: string) => void) => (
+        <Select value={value} onValueChange={onChange}>
+            <SelectTrigger className={selectCls}>
+                <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+                <SelectItem value="SaqlainiApp">SaqlainiApp</SelectItem>
+                <SelectItem value="Chanda">Chanda</SelectItem>
+            </SelectContent>
+        </Select>
+    );
+
+    const holderSelect = (value: string, onChange: (v: string) => void) => (
+        <Select value={value} onValueChange={onChange}>
+            <SelectTrigger className={selectCls}>
+                <SelectValue placeholder="Chuniye..." />
+            </SelectTrigger>
+            <SelectContent>
+                {holders.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}
+            </SelectContent>
+        </Select>
+    );
+
     return (
-        <main className="container max-w-md mx-auto p-4 min-h-screen bg-background pb-24">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
-                <h1 className="text-2xl font-bold" style={{ color: '#0D483B' }}>Form Expenses Entry</h1>
-                <AdminNav />
-            </div>
+        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
+            {/* ---------- New entry ---------- */}
+            <form onSubmit={handleSubmit}>
+                <Panel title="Naya kharch" description="Category chuniye, phir rakam aur tareekh bharein." icon={Receipt} bodyClassName="space-y-4">
+                    <Field label="Category" hint={!formOpen ? 'Category list mein na ho to search karke "+ Add New Entry" dabayein.' : undefined}>
+                        <SearchableSelect
+                            options={nameOptions}
+                            value={selectedName}
+                            onChange={(value) => {
+                                setSelectedName(value);
+                                setShowNewEntryForm(false);
+                            }}
+                            placeholder="Search and select category..."
+                            onNewEntry={() => {
+                                setShowNewEntryForm(true);
+                                setSelectedName('');
+                                setFormData(emptyForm());
+                            }}
+                            showImages={false}
+                        />
+                    </Field>
 
-            <form onSubmit={handleSubmit} className="space-y-4 rounded-[15px] p-6 mb-6" style={{ background: '#FFF8E7', border: '1px solid #E5D3AA' }}>
-                <div className="space-y-2">
-                    <label className="block text-sm font-bold" style={{ color: '#4A3728' }}>Select Category</label>
-                    <SearchableSelect
-                        options={nameOptions}
-                        value={selectedName}
-                        onChange={(value) => {
-                            setSelectedName(value);
-                            setShowNewEntryForm(false);
-                        }}
-                        placeholder="Search and select category..."
-                        onNewEntry={() => {
-                            setShowNewEntryForm(true);
-                            setSelectedName('');
-                            setFormData({
-                                name: '',
-                                description: '',
-                                paymentDate: istToday(),
-                                amount: '',
-                                remark: '',
-                                head: 'SaqlainiApp',
-                                holder: ''
-                            });
-                        }}
-                        showImages={false}
-                    />
-                </div>
+                    {formOpen && (
+                        <>
+                            {showNewEntryForm && (
+                                <Field label="Naya category naam" required>
+                                    <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} required className={inputCls} />
+                                </Field>
+                            )}
 
-                {(showNewEntryForm || selectedName) && (
-                    <>
-                        {showNewEntryForm && (
-                            <div>
-                                <label className="block text-sm font-bold mb-2" style={{ color: '#4A3728' }}>Name *</label>
-                                <Input 
-                                    value={formData.name}
-                                    onChange={(e) => setFormData({...formData, name: e.target.value})}
-                                    required 
-                                    className="rounded-[10px]" 
-                                    style={{ background: 'white', border: '1px solid #E5D3AA' }} 
-                                />
-                            </div>
-                        )}
+                            {!showNewEntryForm && selectedName && (
+                                <div className="rounded-xl bg-muted/70 px-3.5 py-2.5 text-sm font-semibold">{formData.name}</div>
+                            )}
 
-                        {!showNewEntryForm && selectedName && (
-                            <div className="bg-muted p-3 rounded-md text-sm">
-                                <div className="font-bold">{formData.name}</div>
-                            </div>
-                        )}
+                            <Field label="Description" required>
+                                <Textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} required className={textareaCls} />
+                            </Field>
 
-                        <div>
-                            <label className="block text-sm font-bold mb-2" style={{ color: '#4A3728' }}>Description *</label>
-                            <Textarea 
-                                value={formData.description}
-                                onChange={(e) => setFormData({...formData, description: e.target.value})}
-                                required 
-                                className="rounded-[10px]" 
-                                style={{ background: 'white', border: '1px solid #E5D3AA' }} 
-                            />
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-bold mb-2" style={{ color: '#4A3728' }}>Payment Date *</label>
-                                <Input 
-                                    type="date"
-                                    value={formData.paymentDate}
-                                    onChange={(e) => setFormData({...formData, paymentDate: e.target.value})}
-                                    required 
-                                    className="rounded-[10px]" 
-                                    style={{ background: 'white', border: '1px solid #E5D3AA' }} 
-                                />
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <Field label="Payment date" required>
+                                    <Input type="date" value={formData.paymentDate} onChange={(e) => setFormData({ ...formData, paymentDate: e.target.value })} required className={inputCls} />
+                                </Field>
+                                <Field label="Amount (₹)" required>
+                                    <Input type="number" inputMode="numeric" min={1} value={formData.amount} onChange={(e) => setFormData({ ...formData, amount: e.target.value })} required className={inputCls} />
+                                </Field>
                             </div>
 
-                            <div>
-                                <label className="block text-sm font-bold mb-2" style={{ color: '#4A3728' }}>Amount *</label>
-                                <Input 
-                                    type="number"
-                                    value={formData.amount}
-                                    onChange={(e) => setFormData({...formData, amount: e.target.value})}
-                                    required 
-                                    className="rounded-[10px]" 
-                                    style={{ background: 'white', border: '1px solid #E5D3AA' }} 
-                                />
-                            </div>
-                        </div>
+                            <Field label="Head" required hint="Chanda ke paise se kharch hua ho to Chanda chuniye.">
+                                {headSelect(formData.head, (value) => setFormData({ ...formData, head: value }))}
+                            </Field>
 
-                        <div>
-                            <label className="block text-sm font-bold mb-2" style={{ color: '#4A3728' }}>Remark</label>
-                            <Textarea 
-                                value={formData.remark}
-                                onChange={(e) => setFormData({...formData, remark: e.target.value})}
-                                className="rounded-[10px]" 
-                                style={{ background: 'white', border: '1px solid #E5D3AA' }} 
-                            />
-                        </div>
+                            {tracking && formData.head === 'Chanda' && (
+                                <Field label="Kiske paas wale paise se kharch hua?" required>
+                                    {holderSelect(formData.holder, (value) => setFormData({ ...formData, holder: value }))}
+                                </Field>
+                            )}
 
-                        <div>
-                            <label className="block text-sm font-bold mb-2" style={{ color: '#4A3728' }}>Head *</label>
-                            <Select value={formData.head} onValueChange={(value) => setFormData({...formData, head: value})}>
-                                <SelectTrigger className="rounded-[10px]" style={{ background: 'white', border: '1px solid #E5D3AA' }}>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="SaqlainiApp">SaqlainiApp</SelectItem>
-                                    <SelectItem value="Chanda">Chanda</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
+                            <Field label="Remark">
+                                <Textarea value={formData.remark} onChange={(e) => setFormData({ ...formData, remark: e.target.value })} className={textareaCls} />
+                            </Field>
 
-                        {tracking && formData.head === 'Chanda' && (
-                            <div>
-                                <label className="block text-sm font-bold mb-2" style={{ color: '#4A3728' }}>Kiske paas wale paise se kharch hua? *</label>
-                                <Select value={formData.holder} onValueChange={(value) => setFormData({...formData, holder: value})}>
-                                    <SelectTrigger className="rounded-[10px]" style={{ background: 'white', border: '1px solid #E5D3AA' }}>
-                                        <SelectValue placeholder="Chuniye..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {holders.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        )}
+                            <SubmitButton loading={loading} loadingText="Submitting...">Kharch add karein</SubmitButton>
+                        </>
+                    )}
 
-                        <Button type="submit" disabled={loading} className="w-full rounded-[10px]" style={{ background: '#0D483B' }}>
-                            {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...</> : 'Submit'}
-                        </Button>
-                    </>
-                )}
-
-                {message && <p className={`text-sm ${message.startsWith('✓') ? 'text-green-600' : 'text-red-600'}`}>{message}</p>}
+                    {message && <Notice tone={message.ok ? 'success' : 'error'} onClose={() => setMessage(null)}>{message.text}</Notice>}
+                </Panel>
             </form>
 
-            <div className="rounded-[15px] overflow-hidden mb-6" style={{ background: '#FFF8E7', border: '1px solid #E5D3AA' }}>
-                <div className="overflow-x-auto">
-                    <table className="w-full" style={{ minWidth: '800px' }}>
-                        <thead>
-                            <tr style={{ background: '#E5D3AA' }}>
-                                <th className="text-left p-3 text-sm font-bold" style={{ color: '#4A3728' }}>Timestamp</th>
-                                <th className="text-left p-3 text-sm font-bold" style={{ color: '#4A3728' }}>Name</th>
-                                <th className="text-left p-3 text-sm font-bold" style={{ color: '#4A3728' }}>Description</th>
-                                <th className="text-left p-3 text-sm font-bold" style={{ color: '#4A3728' }}>Date</th>
-                                <th className="text-left p-3 text-sm font-bold" style={{ color: '#4A3728' }}>Amount</th>
-                                <th className="text-left p-3 text-sm font-bold" style={{ color: '#4A3728' }}>Remark</th>
-                                <th className="text-left p-3 text-sm font-bold" style={{ color: '#4A3728' }}>Head</th>
-                                <th className="text-left p-3 text-sm font-bold" style={{ color: '#4A3728' }}>Kiske paas se</th>
-                                <th className="text-left p-3 text-sm font-bold" style={{ color: '#4A3728' }}>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {entries.length === 0 ? (
-                                <tr>
-                                    <td colSpan={9} className="text-center py-8 text-sm" style={{ color: '#165E4B' }}>No entries found.</td>
-                                </tr>
-                            ) : entries.map((entry, idx) => (
-                                <tr key={idx} style={{ borderBottom: '1px solid #E5D3AA' }}>
-                                    <td className="p-3 text-xs" style={{ color: '#165E4B' }}>{formatDMYTime(entry.timestamp)}</td>
-                                    <td className="p-3 text-xs" style={{ color: '#4A3728' }}>{entry.name}</td>
-                                    <td className="p-3 text-xs" style={{ color: '#4A3728' }}>{entry.description}</td>
-                                    <td className="p-3 text-xs" style={{ color: '#165E4B' }}>{entry.paymentDate ? formatDMY(entry.paymentDate) : '-'}</td>
-                                    <td className="p-3 text-xs font-bold" style={{ color: '#059669' }}>₹{entry.amount}</td>
-                                    <td className="p-3 text-xs" style={{ color: '#165E4B' }}>{entry.remark}</td>
-                                    <td className="p-3 text-xs font-bold" style={{ color: '#0D483B', background: '#E5D3AA' }}>{entry.head || 'N/A'}</td>
-                                    <td className="p-3 text-xs" style={{ color: '#4A3728' }}>
-                                        {entry.head !== 'Chanda'
-                                            ? '-'
-                                            : entry.holder || (needsHolder(entry) ? <span className="text-red-600 font-bold">Chuna nahi</span> : '-')}
-                                    </td>
-                                    <td className="p-3">
-                                        <div className="flex gap-1">
-                                            <Button size="sm" variant="ghost" onClick={() => handleEdit(entry)}><Edit className="h-4 w-4" /></Button>
-                                            <Button size="sm" variant="ghost" onClick={() => handleDelete(entry)}><Trash2 className="h-4 w-4" /></Button>
+            {/* ---------- Recent entries ---------- */}
+            <Panel
+                title="Recent kharch"
+                description={`Latest ${entries.length} entries`}
+                icon={Inbox}
+                flush
+            >
+                {entries.length === 0 ? (
+                    <EmptyState icon={Inbox} title="Abhi koi kharch nahi" description="Upar se pehla kharch darj karein." />
+                ) : (
+                    <ul className="divide-y divide-border/60">
+                        {entries.map((entry) => (
+                            <li key={entry.rowIndex ?? entry.timestamp} className="flex items-start gap-3 px-4 py-3.5 sm:px-5">
+                                <div className="min-w-0 flex-1">
+                                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                                        <span className="text-sm font-semibold text-foreground">{entry.name}</span>
+                                        <Chip tone={entry.head === 'Chanda' ? 'gold' : 'green'}>{entry.head || 'N/A'}</Chip>
+                                    </div>
+                                    {entry.description && <p className="mt-0.5 text-sm text-foreground/80">{entry.description}</p>}
+                                    <div className="mt-0.5 text-xs text-muted-foreground">
+                                        {entry.paymentDate ? formatDMY(entry.paymentDate) : '-'}
+                                        <span className="mx-1.5 opacity-50">•</span>
+                                        <span title="Entry time">{formatDMYTime(entry.timestamp)}</span>
+                                    </div>
+                                    {entry.remark && <p className="mt-1 text-xs text-foreground/70">{entry.remark}</p>}
+                                    {entry.head === 'Chanda' && (entry.holder || needsHolder(entry)) && (
+                                        <div className="mt-1.5">
+                                            {entry.holder
+                                                ? <Chip tone="green">Kiske paas se: {entry.holder}</Chip>
+                                                : <Chip tone="red">Holder chuna nahi</Chip>}
                                         </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-                <DialogContent className="max-w-[95vw] sm:max-w-md max-h-[85vh] overflow-y-auto">
-                    <DialogHeader>
-                        <DialogTitle>Edit Expense Entry</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-3">
-                        {editMessage && (
-                            <div className="p-3 rounded-md bg-red-100 text-red-800 text-sm">{editMessage}</div>
-                        )}
-                        <div>
-                            <label className="text-sm font-medium">Name</label>
-                            <Input value={editData.name || ''} onChange={(e) => setEditData({...editData, name: e.target.value})} />
-                        </div>
-                        <div>
-                            <label className="text-sm font-medium">Description</label>
-                            <Textarea value={editData.description || ''} onChange={(e) => setEditData({...editData, description: e.target.value})} />
-                        </div>
-                        <div>
-                            <label className="text-sm font-medium">Payment Date</label>
-                            <Input type="date" value={editData.paymentDate || ''} onChange={(e) => setEditData({...editData, paymentDate: e.target.value})} />
-                        </div>
-                        <div>
-                            <label className="text-sm font-medium">Amount</label>
-                            <Input type="number" value={editData.amount || ''} onChange={(e) => setEditData({...editData, amount: e.target.value})} />
-                        </div>
-                        <div>
-                            <label className="text-sm font-medium">Remark</label>
-                            <Textarea value={editData.remark || ''} onChange={(e) => setEditData({...editData, remark: e.target.value})} />
-                        </div>
-                        <div>
-                            <label className="text-sm font-medium">Head</label>
-                            <Select value={editData.head || 'SaqlainiApp'} onValueChange={(value) => setEditData({...editData, head: value})}>
-                                <SelectTrigger>
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="SaqlainiApp">SaqlainiApp</SelectItem>
-                                    <SelectItem value="Chanda">Chanda</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        {tracking && editData.head === 'Chanda' && (needsHolder(editData) ? (
-                            <div>
-                                <label className="text-sm font-medium">Kiske paas wale paise se kharch hua?</label>
-                                <Select value={editData.holder || ''} onValueChange={(value) => setEditData({...editData, holder: value})}>
-                                    <SelectTrigger>
-                                        <SelectValue placeholder="Chuniye..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {holders.map(h => <SelectItem key={h} value={h}>{h}</SelectItem>)}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        ) : (
-                            <p className="text-xs text-muted-foreground">
-                                Ye entry opening cash balance se pehle ki hai - opening mein shamil hai, isliye &quot;Kiske paas se&quot; nahi chuna jata.
-                            </p>
+                                    )}
+                                </div>
+                                <div className="flex shrink-0 flex-col items-end gap-1">
+                                    <span className="text-base font-bold text-red-700">₹{formatIndianCurrency(Number(entry.amount) || 0)}</span>
+                                    <div className="-mr-2 flex">
+                                        <IconButton label={`Edit ${entry.name}`} onClick={() => handleEdit(entry)}>
+                                            <Pencil className="h-4 w-4" />
+                                        </IconButton>
+                                        <IconButton label={`Delete ${entry.name}`} tone="danger" onClick={() => handleDelete(entry)} disabled={deletingRow !== null}>
+                                            {deletingRow === entry.rowIndex ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                                        </IconButton>
+                                    </div>
+                                </div>
+                            </li>
                         ))}
+                    </ul>
+                )}
+            </Panel>
+
+            {/* ---------- Edit ---------- */}
+            <Modal
+                open={showEditDialog}
+                onClose={() => setShowEditDialog(false)}
+                busy={saving}
+                title="Kharch entry edit karein"
+                description={editingRow ? `${editingRow.name}${editingRow.paymentDate ? ` · ${formatDMY(editingRow.paymentDate)}` : ''}` : undefined}
+                footer={
+                    <>
+                        <Button variant="outline" onClick={() => setShowEditDialog(false)} disabled={saving}>Cancel</Button>
+                        <Button onClick={handleUpdate} disabled={saving}>
+                            {saving ? <><Loader2 className="h-4 w-4 animate-spin" /> Saving...</> : 'Save changes'}
+                        </Button>
+                    </>
+                }
+            >
+                <div className="space-y-4">
+                    {editMessage && <Notice tone="error">{editMessage}</Notice>}
+                    <Field label="Category">
+                        <Input value={editData.name || ''} onChange={(e) => setEditData({ ...editData, name: e.target.value })} className={inputCls} />
+                    </Field>
+                    <Field label="Description">
+                        <Textarea value={editData.description || ''} onChange={(e) => setEditData({ ...editData, description: e.target.value })} className={textareaCls} />
+                    </Field>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <Field label="Payment date">
+                            <Input type="date" value={editData.paymentDate || ''} onChange={(e) => setEditData({ ...editData, paymentDate: e.target.value })} className={inputCls} />
+                        </Field>
+                        <Field label="Amount (₹)">
+                            <Input type="number" inputMode="numeric" value={editData.amount || ''} onChange={(e) => setEditData({ ...editData, amount: e.target.value })} className={inputCls} />
+                        </Field>
                     </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setShowEditDialog(false)}>Cancel</Button>
-                        <Button onClick={handleUpdate}>Save</Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-        </main>
+                    <Field label="Remark">
+                        <Textarea value={editData.remark || ''} onChange={(e) => setEditData({ ...editData, remark: e.target.value })} className={textareaCls} />
+                    </Field>
+                    <Field label="Head">
+                        {headSelect(editData.head || 'SaqlainiApp', (value) => setEditData({ ...editData, head: value }))}
+                    </Field>
+                    {tracking && editData.head === 'Chanda' && (needsHolder(editData) ? (
+                        <Field label="Kiske paas wale paise se kharch hua?">
+                            {holderSelect(editData.holder || '', (value) => setEditData({ ...editData, holder: value }))}
+                        </Field>
+                    ) : (
+                        <Notice tone="info">
+                            Ye entry opening cash balance se pehle ki hai - opening mein shamil hai, isliye &quot;Kiske paas se&quot; nahi chuna jata.
+                        </Notice>
+                    ))}
+                </div>
+            </Modal>
+
+            {confirmDialog}
+        </div>
     );
 }

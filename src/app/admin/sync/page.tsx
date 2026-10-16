@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server';
 import { isAdminUser } from '@/lib/admin-access';
 import { SyncControls } from '@/components/admin/SyncControls';
 import { redirect } from 'next/navigation';
-import { AdminNav } from '@/components/admin/AdminNav';
+import { AdminShell } from '@/components/admin/AdminShell';
 
 export const revalidate = 0;
 
@@ -15,13 +15,8 @@ export default async function SyncPage() {
     }
 
     return (
-        <main className="container max-w-md mx-auto p-4 min-h-screen bg-background pb-24">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
-                <h1 className="text-2xl font-bold text-primary font-serif">Manual Data Sync</h1>
-                <AdminNav />
-            </div>
-
+        <AdminShell title="Data Sync" subtitle="Google Sheet ka data app ke database mein dobara layein.">
             <SyncControls />
-        </main>
+        </AdminShell>
     );
 }

@@ -4,31 +4,16 @@ import { fetchAllRows } from '@/lib/fetch-all';
 import { PhotoManagement } from '@/components/PhotoManagement';
 import { User } from '@/types';
 import { redirect } from 'next/navigation';
-import { AdminNav } from '@/components/admin/AdminNav';
+import { AdminShell } from '@/components/admin/AdminShell';
+import { Notice } from '@/components/admin/ui';
 
 export const revalidate = 0;
 
-export default async function PhotosPage() {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-
-    if (!isAdminUser(user)) {
-        redirect('/admin/login');
-    }
-
-    // Paged: a plain select stops at 1000 rows and would silently drop members.
-    const { rows: users, error } = await fetchAllRows<User>(() => supabase
-        .from('user_list')
-        .select('*')
-        .order('name', { ascending: true })
-        .order('id', { ascending: true }));
-
-    if (error) {
-        return <div>Error loading users.</div>;
-    }
-
-    // List all files in the small_image folder. Storage listing is capped per
-    // call too, so keep paging until a short page comes back.
+/**
+ * Member ids that have a photo: every file in the small_image folder. Storage
+ * listing is capped per call too, so keep paging until a short page comes back.
+ */
+async function listPhotoIds(supabase: Awaited<ReturnType<typeof createClient>>): Promise<Set<string>> {
     const existingImages = new Set<string>();
     const LIST_PAGE = 1000;
     for (let offset = 0; offset < 100 * LIST_PAGE; offset += LIST_PAGE) {
@@ -51,6 +36,36 @@ export default async function PhotosPage() {
 
         if (fileList.length < LIST_PAGE) break;
     }
+    return existingImages;
+}
+
+export default async function PhotosPage() {
+    const supabase = await createClient();
+
+    // Admin check, member list and photo listing load together instead of one
+    // after another. Nothing is rendered until the check has passed.
+    const [{ data: { user } }, { rows: users, error }, existingImages] = await Promise.all([
+        supabase.auth.getUser(),
+        // Paged: a plain select stops at 1000 rows and would silently drop members.
+        fetchAllRows<User>(() => supabase
+            .from('user_list')
+            .select('*')
+            .order('name', { ascending: true })
+            .order('id', { ascending: true })),
+        listPhotoIds(supabase),
+    ]);
+
+    if (!isAdminUser(user)) {
+        redirect('/admin/login');
+    }
+
+    if (error) {
+        return (
+            <AdminShell title="Photo Management">
+                <Notice tone="error">Members load nahi ho paaye. Page refresh karke dobara try karein.</Notice>
+            </AdminShell>
+        );
+    }
 
     const usersWithImages = users.map(user => {
         return {
@@ -60,13 +75,8 @@ export default async function PhotosPage() {
     });
 
     return (
-        <main className="container max-w-lg mx-auto p-4 min-h-screen bg-background pb-24">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-6">
-                <h1 className="text-2xl font-bold text-primary font-serif">Photo Management</h1>
-                <AdminNav />
-            </div>
-
+        <AdminShell title="Photo Management" subtitle="Member ki photo badlein ya hataein.">
             <PhotoManagement users={usersWithImages} />
-        </main>
+        </AdminShell>
     );
 }

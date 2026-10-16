@@ -18,10 +18,10 @@ export function AdminPageClient({ users }: { users: User[] }) {
     };
 
     return (
-        <>
+        <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,26rem)_minmax(0,1fr)]">
             <SmartEntryForm users={users} onPaymentSuccess={handlePaymentSuccess} />
             {/* Editing or deleting an entry re-syncs members' due months too. */}
             <PaymentEntriesTable refreshTrigger={refreshTrigger} onDataChanged={() => router.refresh()} />
-        </>
+        </div>
     );
 }

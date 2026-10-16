@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { getChandaEntries, ChandaGroup, ChandaStats } from '@/app/actions/finance';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -25,10 +25,15 @@ export function ChandaForm() {
     const [isExporting, setIsExporting] = useState(false);
     const [exportError, setExportError] = useState('');
 
+    // The very first load starts at once; only typing in the search box is
+    // debounced (the opening load used to wait out the 300ms too).
+    const firstLoadRef = useRef(true);
     useEffect(() => {
+        const delay = firstLoadRef.current ? 0 : 300;
         const timer = setTimeout(() => {
+            firstLoadRef.current = false;
             loadData(search);
-        }, 300);
+        }, delay);
         return () => clearTimeout(timer);
     }, [search]);
 

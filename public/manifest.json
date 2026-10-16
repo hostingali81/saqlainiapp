@@ -1,23 +1,63 @@
 {
+    "id": "/",
     "name": "Saqlaini App - Islamic Community Manager",
     "short_name": "SaqlainiApp",
     "description": "Modern Islamic community management system with Arabic aesthetics",
+    "lang": "en",
+    "dir": "ltr",
+    "categories": ["finance", "productivity"],
     "icons": [
         {
             "src": "/icons/icon-192x192.png",
             "sizes": "192x192",
-            "type": "image/png"
+            "type": "image/png",
+            "purpose": "any"
         },
         {
             "src": "/icons/icon-512x512.png",
             "sizes": "512x512",
-            "type": "image/png"
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "/icons/icon-maskable-192x192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "/icons/icon-maskable-512x512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
         }
     ],
     "theme_color": "#145948",
     "background_color": "#F9FCEF",
     "display": "standalone",
-    "start_url": "/",
+    "display_override": ["standalone", "minimal-ui"],
+    "start_url": "/?source=pwa",
     "orientation": "portrait",
-    "scope": "/"
+    "scope": "/",
+    "prefer_related_applications": false,
+    "shortcuts": [
+        {
+            "name": "Chanda",
+            "short_name": "Chanda",
+            "url": "/chanda?source=shortcut",
+            "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192", "type": "image/png" }]
+        },
+        {
+            "name": "Expenses",
+            "short_name": "Expenses",
+            "url": "/expenses?source=shortcut",
+            "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192", "type": "image/png" }]
+        },
+        {
+            "name": "Admin",
+            "short_name": "Admin",
+            "url": "/admin?source=shortcut",
+            "icons": [{ "src": "/icons/icon-192x192.png", "sizes": "192x192", "type": "image/png" }]
+        }
+    ]
 }

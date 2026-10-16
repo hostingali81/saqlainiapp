@@ -1,7 +1,21 @@
 'use client';
 
-import { useMemo } from 'react';
 import { applyAvatarFallback, getPhotoUrl } from '@/lib/utils';
+
+/**
+ * Cache-buster for the full-size photo.
+ *
+ * In the browser it is fixed for the life of the loaded app: a new value on
+ * every mount re-downloaded the photo each time a profile was opened, now it
+ * downloads once per app session (a changed photo shows on the next app open).
+ * On the server it stays per request, as before, so a directly opened profile
+ * never gets an old cached copy.
+ */
+const SESSION_VERSION = Date.now();
+
+function photoVersion() {
+    return typeof window === 'undefined' ? Date.now() : SESSION_VERSION;
+}
 
 interface ProfileImageProps {
     userId: number;
@@ -9,14 +23,12 @@ interface ProfileImageProps {
 }
 
 export function ProfileImage({ userId, userName }: ProfileImageProps) {
-    // Calling Date.now() during render gave the server and the client different
-    // URLs (a hydration mismatch) and re-downloaded the photo on every render.
-    // One value per mount still busts the cache on a page reload.
-    const version = useMemo(() => Date.now(), []);
-
     return (
         <img
-            src={`${getPhotoUrl(userId, 'large')}?v=${version}`}
+            src={`${getPhotoUrl(userId, 'large')}?v=${photoVersion()}`}
+            // Server and browser versions differ on a first load; the
+            // server's URL is kept, which is fine.
+            suppressHydrationWarning
             alt={userName}
             className="mx-auto mb-4 rounded-full object-cover"
             style={{

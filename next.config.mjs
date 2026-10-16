@@ -12,6 +12,23 @@ const nextConfig = {
     minimumCacheTTL: 60,
   },
   compress: true,
+  async headers() {
+    // The service worker and manifest must always be re-checked, otherwise an
+    // update can take days to reach installed apps.
+    return [
+      {
+        source: '/sw.js',
+        headers: [
+          { key: 'Cache-Control', value: 'no-cache, no-store, must-revalidate' },
+          { key: 'Service-Worker-Allowed', value: '/' },
+        ],
+      },
+      {
+        source: '/manifest.json',
+        headers: [{ key: 'Cache-Control', value: 'no-cache' }],
+      },
+    ];
+  },
   poweredByHeader: false,
   reactStrictMode: true,
   experimental: {

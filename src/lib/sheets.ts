@@ -3,7 +3,7 @@ import { istNow, isIsoDate, serialToIsoDate, serialToIsoDateTime, textToIsoDate 
 
 const SCOPES = ['https://www.googleapis.com/auth/spreadsheets'];
 
-export async function getAuthClient() {
+async function createAuthClient() {
     const jsonKey = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
     if (!jsonKey) {
         throw new Error('Missing GOOGLE_SERVICE_ACCOUNT_JSON in .env.local');
@@ -21,6 +21,40 @@ export async function getAuthClient() {
     }
 }
 
+/*
+ * One auth client (and one Sheets API object) per server instance.
+ *
+ * A fresh client per call had no access token yet, so EVERY sheet read/write
+ * first made an extra round trip to Google's token endpoint. The client keeps
+ * its token and renews it by itself shortly before it expires (concurrent
+ * callers share that renewal), so reusing it is safe. A failed setup is not
+ * kept, so the next call simply tries again.
+ */
+let authClientPromise: ReturnType<typeof createAuthClient> | null = null;
+let sheetsApiPromise: Promise<ReturnType<typeof google.sheets>> | null = null;
+
+export function getAuthClient() {
+    if (!authClientPromise) {
+        authClientPromise = createAuthClient().catch((e) => {
+            authClientPromise = null;
+            throw e;
+        });
+    }
+    return authClientPromise;
+}
+
+function getSheetsApi() {
+    if (!sheetsApiPromise) {
+        sheetsApiPromise = getAuthClient()
+            .then((auth) => google.sheets({ version: 'v4', auth: auth as any }))
+            .catch((e) => {
+                sheetsApiPromise = null;
+                throw e;
+            });
+    }
+    return sheetsApiPromise;
+}
+
 /**
  * Cell values of `range`.
  *
@@ -36,8 +70,7 @@ export async function getSheetData(range: string, options: { raw?: boolean } = {
         throw new Error('Missing GOOGLE_SHEET_ID in .env.local');
     }
 
-    const auth = await getAuthClient();
-    const sheets = google.sheets({ version: 'v4', auth: auth as any });
+    const sheets = await getSheetsApi();
 
     try {
         const response = await sheets.spreadsheets.values.get({
@@ -59,8 +92,7 @@ export async function updateSheetRow(range: string, values: any[][]) {
         throw new Error('Missing GOOGLE_SHEET_ID in .env.local');
     }
 
-    const auth = await getAuthClient();
-    const sheets = google.sheets({ version: 'v4', auth: auth as any });
+    const sheets = await getSheetsApi();
 
     try {
         const response = await sheets.spreadsheets.values.update({
@@ -84,8 +116,7 @@ export async function deleteSheetRow(rowIndex: number, sheetId: number = 0) {
         throw new Error('Missing GOOGLE_SHEET_ID in .env.local');
     }
 
-    const auth = await getAuthClient();
-    const sheets = google.sheets({ version: 'v4', auth: auth as any });
+    const sheets = await getSheetsApi();
 
     try {
         const response = await sheets.spreadsheets.batchUpdate({
@@ -149,8 +180,7 @@ export async function readNormalizedRanges(specs: Array<{ range: string; dates?:
         throw new Error('Missing GOOGLE_SHEET_ID in .env.local');
     }
 
-    const auth = await getAuthClient();
-    const sheets = google.sheets({ version: 'v4', auth: auth as any });
+    const sheets = await getSheetsApi();
     const response = await sheets.spreadsheets.values.batchGet({
         spreadsheetId,
         ranges: specs.map(s => s.range),
@@ -168,8 +198,7 @@ export async function getSheetIdByTitle(title: string): Promise<number | null> {
         throw new Error('Missing GOOGLE_SHEET_ID in .env.local');
     }
 
-    const auth = await getAuthClient();
-    const sheets = google.sheets({ version: 'v4', auth: auth as any });
+    const sheets = await getSheetsApi();
     const meta = await sheets.spreadsheets.get({ spreadsheetId, fields: 'sheets(properties(title,sheetId))' });
     const found = meta.data.sheets?.find(s => s.properties?.title === title);
     return found?.properties?.sheetId ?? null;
@@ -333,8 +362,7 @@ export async function appendToSheet(range: string, values: any[][]) {
         throw new Error('Missing GOOGLE_SHEET_ID in .env.local');
     }
 
-    const auth = await getAuthClient();
-    const sheets = google.sheets({ version: 'v4', auth: auth as any });
+    const sheets = await getSheetsApi();
 
     try {
         const response = await sheets.spreadsheets.values.append({

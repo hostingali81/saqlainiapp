@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getExpenses, getAllExpenses, getExpensePageStats, getCategories } from '@/app/actions/finance';
+import { getExpensesWithStats, getAllExpenses, getCategories } from '@/app/actions/finance';
 import { Expense } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -217,13 +217,10 @@ export function ExpensesForm() {
         const fetchData = async () => {
             setLoading(true);
             setStats(null);
-            const [expenseResponse, statsData] = await Promise.all([
-                getExpenses(page, 50, category, appliedSearch),
-                getExpensePageStats(category, appliedSearch)
-            ]);
+            const { data, total, stats: statsData } = await getExpensesWithStats(page, 50, category, appliedSearch);
             if (cancelled) return;
-            setExpenses(expenseResponse.data);
-            setTotal(expenseResponse.total);
+            setExpenses(data);
+            setTotal(total);
             setStats(statsData);
             setLoading(false);
         };

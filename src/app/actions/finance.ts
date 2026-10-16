@@ -243,6 +243,20 @@ export async function getExpensePageStats(category?: string, search?: string) {
     return { totalAmount, totalTransactions, totalCategories };
 }
 
+/**
+ * One page of expenses plus the headline stats for the same filters, in a
+ * single request. Server actions from the browser run one after another, so
+ * asking for the two separately cost a whole extra round trip; here they run
+ * side by side on the server.
+ */
+export async function getExpensesWithStats(page: number = 1, limit: number = 50, category?: string, search?: string) {
+    const [list, stats] = await Promise.all([
+        getExpenses(page, limit, category, search),
+        getExpensePageStats(category, search),
+    ]);
+    return { ...list, stats };
+}
+
 export async function getCategories() {
     const supabase = await createClient();
 

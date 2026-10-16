@@ -1,5 +1,8 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
+    // `hover:` classes only apply on devices that can really hover - on touch
+    // screens they used to stick after a tap.
+    future: { hoverOnlyWhenSupported: true },
     darkMode: ["class"],
     content: [
         "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",

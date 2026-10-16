@@ -2,8 +2,15 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
+import { RefreshCw, HandCoins, Receipt, WalletCards, Loader2 } from 'lucide-react';
 import { triggerSync } from '@/app/actions/sync';
+import { Notice, Panel } from '@/components/admin/ui';
+
+const TARGETS = [
+    { id: 'payment', label: 'Payments', hint: 'Members ke payment aur due months', icon: WalletCards },
+    { id: 'db_chanda', label: 'Chanda', hint: 'Chanda ki entries', icon: HandCoins },
+    { id: 'expenses', label: 'Expenses', hint: 'Kharch ki entries', icon: Receipt },
+];
 
 export function SyncControls() {
     const [loading, setLoading] = useState<string | null>(null);
@@ -16,7 +23,7 @@ export function SyncControls() {
         try {
             const res = await triggerSync(target);
             if (res.success) {
-                setStatus({ type: 'success', message: `Sync for ${label} completed successfully!` });
+                setStatus({ type: 'success', message: `${label} sync ho gaya.` });
                 console.log('Sync Results:', res.results);
             } else {
                 setStatus({ type: 'error', message: `Sync failed: ${res.error}` });
@@ -30,55 +37,55 @@ export function SyncControls() {
     };
 
     return (
-        <div className="bg-card text-card-foreground p-4 rounded-lg shadow-sm border mb-6">
-            <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <RefreshCw className="h-5 w-5" />
-                Manual Data Sync
-            </h2>
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <div className="space-y-4">
+            <Panel
+                title="Sab kuchh sync karein"
+                description="Google Sheet ka poora data app ke database mein dobara layein. Sheet mein seedha badlav kiya ho tab use karein."
+                icon={RefreshCw}
+                bodyClassName="space-y-3"
+            >
                 <Button
-                    variant="default"
-                    onClick={() => handleSync('all', 'All Data')}
+                    size="lg"
+                    onClick={() => handleSync('all', 'All data')}
                     disabled={loading !== null}
-                    className="w-full"
+                    className="w-full rounded-lg"
                 >
-                    {loading === 'all' ? 'Syncing...' : 'Sync All'}
+                    {loading === 'all' ? <><Loader2 className="h-4 w-4 animate-spin" /> Syncing...</> : <><RefreshCw className="h-4 w-4" /> Sync all</>}
                 </Button>
-                <Button
-                    variant="outline"
-                    onClick={() => handleSync('payment', 'Payments')}
-                    disabled={loading !== null}
-                    className="w-full"
-                >
-                    {loading === 'payment' ? '...' : 'Payments'}
-                </Button>
-                <Button
-                    variant="outline"
-                    onClick={() => handleSync('db_chanda', 'Chanda')}
-                    disabled={loading !== null}
-                    className="w-full"
-                >
-                    {loading === 'db_chanda' ? '...' : 'Chanda'}
-                </Button>
-                <Button
-                    variant="outline"
-                    onClick={() => handleSync('expenses', 'Expenses')}
-                    disabled={loading !== null}
-                    className="w-full"
-                >
-                    {loading === 'expenses' ? '...' : 'Expenses'}
-                </Button>
-            </div>
+            </Panel>
+
+            <Panel title="Sirf ek hissa sync karein" description="Jaldi hota hai - jo hissa badla ho wahi chuniye." bodyClassName="space-y-2">
+                {TARGETS.map(t => {
+                    const Icon = t.icon;
+                    const active = loading === t.id;
+                    return (
+                        <button
+                            key={t.id}
+                            type="button"
+                            onClick={() => handleSync(t.id, t.label)}
+                            disabled={loading !== null}
+                            className="flex w-full items-center gap-3 rounded-xl border border-border bg-white px-3.5 py-3 text-left transition-colors hover:bg-muted active:bg-muted disabled:opacity-60"
+                        >
+                            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                {active ? <Loader2 className="h-4 w-4 animate-spin" /> : <Icon className="h-4 w-4" />}
+                            </span>
+                            <span className="min-w-0 flex-1">
+                                <span className="block text-sm font-semibold">{t.label}</span>
+                                <span className="block text-xs text-muted-foreground">{t.hint}</span>
+                            </span>
+                            <span className="text-xs font-medium text-primary">{active ? 'Syncing...' : 'Sync'}</span>
+                        </button>
+                    );
+                })}
+            </Panel>
+
             {loading && (
-                <p className="text-xs text-muted-foreground mt-3 text-center animate-pulse">
-                    Please wait, analyzing Sheet data and updating database...
-                </p>
+                <Notice tone="info">Please wait - Sheet ka data check karke database update ho raha hai. Page band na karein.</Notice>
             )}
             {status.type && (
-                <div className={`mt-3 text-sm flex items-center justify-center gap-2 ${status.type === 'success' ? 'text-green-600' : 'text-red-600'}`}>
-                    {status.type === 'success' ? <CheckCircle className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+                <Notice tone={status.type === 'success' ? 'success' : 'error'} onClose={() => setStatus({ type: null, message: '' })}>
                     {status.message}
-                </div>
+                </Notice>
             )}
         </div>
     );

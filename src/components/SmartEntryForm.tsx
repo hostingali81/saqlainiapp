@@ -4,9 +4,8 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { User, MonthStatus } from '@/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SearchableSelect } from '@/components/ui/searchable-select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Field, Modal, Notice, Panel, inputCls, selectCls } from '@/components/admin/ui';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { processSmartPayment, getUserProfile, createNewUserPayment } from '@/app/actions/user';
 import {
@@ -18,7 +17,7 @@ import {
     PaymentAllocation,
     AllocationChoice
 } from '@/lib/logic';
-import { Check, UserPlus } from 'lucide-react';
+import { Check, Loader2, MessageSquarePlus, UserPlus, WalletCards } from 'lucide-react';
 import { getPhotoUrl } from '@/lib/utils';
 
 interface SmartEntryFormProps {
@@ -304,7 +303,7 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
     const allocationChips = (
         <div className="flex flex-wrap gap-2">
             {allocations.map(a => (
-                <span key={monthKeyOf(a)} className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700">
+                <span key={monthKeyOf(a)} className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-800">
                     {a.monthName} {a.year} - ₹{amountFor(a)}
                 </span>
             ))}
@@ -313,13 +312,8 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
 
     return (
         <>
-            <Card className="w-full max-w-lg mx-auto border-t-4 border-t-secondary mb-6">
-                <CardHeader>
-                    <CardTitle>Payment Entry</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4 pb-32">
-                    <div className="space-y-2">
-                        <label className="text-sm font-medium">Select User</label>
+            <Panel title="Payment entry" description="Member chuniye, rakam likhiye - months apne aap allocate honge." icon={WalletCards} bodyClassName="space-y-4">
+                    <Field label="Member">
                         <SearchableSelect
                             options={userOptions}
                             value={selectedUserId}
@@ -337,45 +331,48 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
                                 setResult(null);
                             }}
                         />
-                    </div>
+                    </Field>
 
                     {showNewEntryForm && (
-                        <div className="space-y-3 p-4 bg-gray-50 rounded-md border border-gray-200">
-                            <h4 className="text-sm font-semibold text-gray-700">New User Payment Entry</h4>
+                        <div className="space-y-3 rounded-xl border border-dashed border-primary/30 bg-primary/5 p-4">
+                            <h4 className="flex items-center gap-1.5 text-sm font-semibold text-primary"><UserPlus className="h-4 w-4" /> Naya member + payment</h4>
 
                             <div className="space-y-2">
-                                <label className="text-xs font-medium">Name *</label>
+                                <label className="text-sm font-medium">Name *</label>
                                 <Input
                                     type="text"
                                     placeholder="Enter name"
                                     value={newEntryData.name}
                                     onChange={(e) => setNewEntryData({ ...newEntryData, name: e.target.value })}
+                                    className={inputCls}
                                 />
                             </div>
 
                             <div className="space-y-2">
-                                <label className="text-xs font-medium">Father Name *</label>
+                                <label className="text-sm font-medium">Father Name *</label>
                                 <Input
                                     type="text"
                                     placeholder="Enter father name"
                                     value={newEntryData.fname}
                                     onChange={(e) => setNewEntryData({ ...newEntryData, fname: e.target.value })}
+                                    className={inputCls}
                                 />
                             </div>
 
                             <div className="space-y-2">
-                                <label className="text-xs font-medium">Mobile No *</label>
+                                <label className="text-sm font-medium">Mobile No *</label>
                                 <Input
                                     type="tel"
                                     inputMode="numeric"
                                     placeholder="10 digit mobile number"
                                     value={newEntryData.phone}
                                     onChange={(e) => setNewEntryData({ ...newEntryData, phone: e.target.value })}
+                                    className={inputCls}
                                 />
                             </div>
 
                             <div className="space-y-2">
-                                <label className="text-xs font-medium">Amount (₹) *</label>
+                                <label className="text-sm font-medium">Amount (₹) *</label>
                                 <Input
                                     type="number"
                                     min={1}
@@ -383,16 +380,17 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
                                     placeholder="Enter amount"
                                     value={newEntryData.amount}
                                     onChange={(e) => setNewEntryData({ ...newEntryData, amount: e.target.value })}
+                                    className={inputCls}
                                 />
                             </div>
 
                             <div className="space-y-2">
-                                <label className="text-xs font-medium">Payment Frequency *</label>
+                                <label className="text-sm font-medium">Payment Frequency *</label>
                                 <Select
                                     value={newEntryData.frequency}
                                     onValueChange={(value: 'Regular' | 'One Time') => setNewEntryData({ ...newEntryData, frequency: value })}
                                 >
-                                    <SelectTrigger>
+                                    <SelectTrigger className={selectCls}>
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -403,24 +401,26 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
                             </div>
 
                             <div className="space-y-2">
-                                <label className="text-xs font-medium">Remarks</label>
+                                <label className="text-sm font-medium">Remarks</label>
                                 <Input
                                     type="text"
                                     placeholder="Optional remarks"
                                     value={newEntryData.remarks}
                                     onChange={(e) => setNewEntryData({ ...newEntryData, remarks: e.target.value })}
+                                    className={inputCls}
                                 />
                             </div>
 
                             <Button
-                                className="w-full bg-green-600 hover:bg-green-700"
+                                size="lg"
+                                className="w-full rounded-lg"
                                 disabled={loading}
                                 onClick={handleNewEntrySubmit}
                             >
-                                {loading ? 'Processing...' : (
+                                {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Processing...</> : (
                                     <>
-                                        <UserPlus className="mr-2 h-4 w-4" />
-                                        Submit New Entry
+                                        <UserPlus className="h-4 w-4" />
+                                        Submit new entry
                                     </>
                                 )}
                             </Button>
@@ -428,37 +428,35 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
                     )}
 
                     {!showNewEntryForm && selectedUser && (
-                        <div className="bg-muted p-3 rounded-md text-sm grid grid-cols-2 gap-2">
-                            <div>
-                                <span className="text-muted-foreground">Total Due Months:</span>
-                                <p className="font-bold text-red-600">{selectedUser.bakaya_month}</p>
+                        <div className="grid grid-cols-2 gap-2">
+                            <div className="rounded-xl bg-muted/70 px-3.5 py-2.5">
+                                <span className="text-xs text-muted-foreground">Due months</span>
+                                <p className={`text-lg font-bold ${selectedUser.bakaya_month > 0 ? 'text-red-600' : 'text-emerald-700'}`}>{selectedUser.bakaya_month}</p>
                             </div>
-                            <div>
-                                <span className="text-muted-foreground">Total Amount:</span>
-                                <p className="font-bold text-red-600">₹{selectedUser.bakaya_month * (selectedUser.amount || MONTHLY_RATE)}</p>
+                            <div className="rounded-xl bg-muted/70 px-3.5 py-2.5">
+                                <span className="text-xs text-muted-foreground">Baki rakam</span>
+                                <p className={`text-lg font-bold ${selectedUser.bakaya_month > 0 ? 'text-red-600' : 'text-emerald-700'}`}>₹{selectedUser.bakaya_month * (selectedUser.amount || MONTHLY_RATE)}</p>
                             </div>
                         </div>
                     )}
 
                     {!showNewEntryForm && selectedUser && selectedUser.frequency !== 'One Time' && loadingMonths && (
-                        <div className="text-sm text-muted-foreground text-center p-2">Loading due months...</div>
+                        <div className="flex items-center justify-center gap-2 p-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> Due months load ho rahe hain...</div>
                     )}
 
                     {!showNewEntryForm && selectedUser && !loadingMonths && (
                         selectedUser.frequency !== 'One Time' && dueMonths.length > 0 ? (
-                            <div className="bg-red-50 border border-red-200 rounded-md p-3">
-                                <div className="flex items-center justify-between mb-2">
-                                    <p className="text-sm font-semibold text-red-800">Due Months:</p>
+                            <div className="rounded-xl border border-red-200 bg-red-50 p-3">
+                                <div className="mb-2 flex items-center justify-between">
+                                    <p className="text-sm font-semibold text-red-800">Due months</p>
                                     <button
                                         type="button"
                                         onClick={() => setShowRemarkDialog(true)}
                                         disabled={allocations.length === 0}
-                                        className="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200 flex items-center gap-1 disabled:opacity-50"
+                                        className="inline-flex h-8 items-center gap-1.5 rounded-lg bg-white px-2.5 text-xs font-medium text-primary shadow-sm ring-1 ring-border hover:bg-muted disabled:opacity-50"
                                     >
-                                        <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 20 20">
-                                            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                                        </svg>
-                                        Remarks
+                                        <MessageSquarePlus className="h-3.5 w-3.5" />
+                                        Remarks / amounts
                                     </button>
                                 </div>
                                 <div className="flex flex-wrap gap-2">
@@ -469,8 +467,8 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
                                         return (
                                             <span
                                                 key={monthKeyOf(m)}
-                                                className={`text-xs px-2 py-1 rounded-full ${allocatedAmount > 0
-                                                    ? 'bg-green-100 text-green-700'
+                                                className={`rounded-full px-2.5 py-1 text-xs font-medium ${allocatedAmount > 0
+                                                    ? 'bg-emerald-100 text-emerald-800'
                                                     : 'bg-red-100 text-red-700'
                                                     }`}
                                             >
@@ -488,7 +486,7 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
                                         <p className="text-xs font-semibold text-green-800 mb-1">This payment goes to:</p>
                                         <div className="flex flex-wrap gap-2">
                                             {outsideDueAllocations.map(a => (
-                                                <span key={monthKeyOf(a)} className="text-xs px-2 py-1 rounded-full bg-green-100 text-green-700">
+                                                <span key={monthKeyOf(a)} className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-800">
                                                     {a.monthName} {a.year} - ₹{amountFor(a)} (top-up)
                                                 </span>
                                             ))}
@@ -497,21 +495,22 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
                                 )}
                             </div>
                         ) : allocations.length > 0 ? (
-                            <div className="bg-green-50 border border-green-200 rounded-md p-3">
-                                <p className="text-sm font-semibold text-green-800 mb-2">Payment Allocation:</p>
+                            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                                <p className="mb-2 text-sm font-semibold text-emerald-900">Payment allocation</p>
                                 {allocationChips}
                             </div>
                         ) : null
                     )}
 
                     {!showNewEntryForm && (
-                        <div className="space-y-2">
-                            <label className="text-sm font-medium">Paid Amount (₹)</label>
+                        <Field label="Paid amount (₹)">
                             <Input
                                 ref={amountInputRef}
                                 type="number"
+                                inputMode="numeric"
                                 min={1}
                                 step={1}
+                                className={`${inputCls} text-lg font-semibold`}
                                 placeholder="e.g. 500"
                                 value={amount}
                                 onChange={(e) => {
@@ -550,14 +549,14 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
                                     Month-wise total is ₹{allocatedTotal} but the paid amount is ₹{amountNum}. Fix the amounts under Remarks.
                                 </p>
                             )}
-                        </div>
+                        </Field>
                     )}
 
                     {/* An up-to-date member paying again lands on a month that is
                         already paid. That is fine, but the admin should see it
                         stated rather than just a green chip. */}
                     {!showNewEntryForm && !needsChoice && alreadyPaidAllocations.length > 0 && (
-                        <div className="rounded-md border border-amber-300 bg-amber-50 p-3 space-y-1">
+                        <div className="space-y-1 rounded-xl border border-amber-300 bg-amber-50 p-3">
                             <p className="text-sm font-semibold text-amber-900">Already paid — this will be added on top</p>
                             {alreadyPaidAllocations.map(({ allocation, existing }) => (
                                 <p key={monthKeyOf(allocation)} className="text-xs text-amber-800">
@@ -569,7 +568,7 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
                     )}
 
                     {!showNewEntryForm && needsChoice && (
-                        <div className="rounded-md border border-amber-300 bg-amber-50 p-3 space-y-2">
+                        <div className="space-y-2 rounded-xl border border-amber-300 bg-amber-50 p-3">
                             <p className="text-sm font-semibold text-amber-900">Where should this payment go?</p>
                             <p className="text-xs text-amber-800">
                                 {currentMonthEntry?.monthName} {currentMonthEntry?.year} already has ₹{currentMonthEntry?.amount} paid,
@@ -578,11 +577,11 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
                             </p>
 
                             <div className="space-y-1">
-                                <label className="flex items-start gap-2 p-2 rounded cursor-pointer hover:bg-amber-100">
+                                <label className="flex cursor-pointer items-start gap-3 rounded-lg p-2.5 hover:bg-amber-100 has-[:checked]:bg-amber-100">
                                     <input
                                         type="radio"
                                         name="allocationChoice"
-                                        className="mt-1"
+                                        className="mt-1 h-4 w-4 accent-primary"
                                         checked={allocationChoice === 'oldest'}
                                         onChange={() => setAllocationChoice('oldest')}
                                     />
@@ -596,11 +595,11 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
                                     </span>
                                 </label>
 
-                                <label className="flex items-start gap-2 p-2 rounded cursor-pointer hover:bg-amber-100">
+                                <label className="flex cursor-pointer items-start gap-3 rounded-lg p-2.5 hover:bg-amber-100 has-[:checked]:bg-amber-100">
                                     <input
                                         type="radio"
                                         name="allocationChoice"
-                                        className="mt-1"
+                                        className="mt-1 h-4 w-4 accent-primary"
                                         checked={allocationChoice === 'currentMonth'}
                                         onChange={() => setAllocationChoice('currentMonth')}
                                     />
@@ -625,13 +624,14 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
 
                     {!showNewEntryForm && (
                         <Button
-                            className="w-full bg-primary hover:bg-primary/90"
+                            size="lg"
+                            className="w-full rounded-lg"
                             disabled={!canSubmit}
                             onClick={handlePayment}
                         >
-                            {loading ? 'Processing...' : (
+                            {loading ? <><Loader2 className="h-4 w-4 animate-spin" /> Processing...</> : (
                                 <>
-                                    <Check className="mr-2 h-4 w-4" />
+                                    <Check className="h-4 w-4" />
                                     {dueMonths.length > 0 ? 'Clear Due Months' : 'Add Payment'}
                                 </>
                             )}
@@ -639,101 +639,31 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
                     )}
 
                     {result && (
-                        <div className={`p-3 rounded-md text-sm ${result.success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                            {result.error ? (
-                                <p>Error: {result.error}</p>
-                            ) : (
-                                <div>
-                                    <p className="font-bold">Success! Payment Allocated:</p>
-                                    <ul className="list-disc list-inside mt-1">
-                                        {result.allocated?.map((a, i) => (
-                                            <li key={i}>{a.monthName ? `${a.monthName} ${a.year}` : `${a.year}-${a.month}`}: ₹{a.amount}</li>
-                                        ))}
-                                    </ul>
-                                    {result.warning && (
-                                        <p className="mt-2 text-amber-800 bg-amber-100 rounded p-2">⚠ {result.warning}</p>
-                                    )}
-                                </div>
-                            )}
-                        </div>
+                        result.error ? (
+                            <Notice tone="error" onClose={() => setResult(null)}>{result.error}</Notice>
+                        ) : (
+                            <Notice tone="success" onClose={() => setResult(null)}>
+                                <p className="font-semibold">Payment darj ho gaya</p>
+                                <ul className="mt-1 space-y-0.5">
+                                    {result.allocated?.map((a, i) => (
+                                        <li key={i}>{a.monthName ? `${a.monthName} ${a.year}` : `${a.year}-${a.month}`}: ₹{a.amount}</li>
+                                    ))}
+                                </ul>
+                                {result.warning && (
+                                    <p className="mt-2 rounded-lg bg-amber-100 p-2 text-amber-900">⚠ {result.warning}</p>
+                                )}
+                            </Notice>
+                        )
                     )}
-                </CardContent>
-            </Card>
+            </Panel>
 
-            <Dialog open={showRemarkDialog} onOpenChange={setShowRemarkDialog}>
-                <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
-                    <DialogHeader>
-                        <DialogTitle>Add Remarks</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-3">
-                        <div className="flex flex-col sm:flex-row gap-2">
-                            <Input
-                                type="text"
-                                placeholder="Global remark for all months"
-                                value={globalRemark}
-                                onChange={(e) => setGlobalRemark(e.target.value)}
-                                className="text-sm flex-1"
-                            />
-                            <Button
-                                type="button"
-                                size="sm"
-                                onClick={applyGlobalRemark}
-                                className="w-full sm:w-auto"
-                            >
-                                Apply to All
-                            </Button>
-                        </div>
-                        <div className="space-y-2 max-h-[50vh] overflow-y-auto">
-                            {allocations.map(a => {
-                                const monthKey = monthKeyOf(a);
-                                return (
-                                    <div key={monthKey} className="space-y-1 p-3 bg-gray-50 rounded-md">
-                                        <label className="text-xs font-medium text-green-700">
-                                            {a.monthName} {a.year}
-                                        </label>
-                                        <div className="flex gap-2">
-                                            <div className="flex-1">
-                                                <Input
-                                                    type="number"
-                                                    min={1}
-                                                    step={1}
-                                                    placeholder="Amount"
-                                                    // `||` here meant a typed 0 silently fell back to
-                                                    // the calculated amount on screen while 0 was what
-                                                    // actually got submitted.
-                                                    value={customAmounts[monthKey] ?? a.amount}
-                                                    onChange={(e) => {
-                                                        const raw = e.target.value;
-                                                        setCustomAmounts(prev => {
-                                                            const next = { ...prev };
-                                                            if (raw === '') delete next[monthKey];
-                                                            else next[monthKey] = Number(raw);
-                                                            return next;
-                                                        });
-                                                    }}
-                                                    className="text-sm"
-                                                />
-                                            </div>
-                                            <div className="flex-1">
-                                                <Input
-                                                    type="text"
-                                                    placeholder="Remark (optional)"
-                                                    value={remarks[monthKey] || ''}
-                                                    onChange={(e) => setRemarks({ ...remarks, [monthKey]: e.target.value })}
-                                                    className="text-sm"
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                        <div className={`text-sm rounded-md p-2 ${totalsMatch ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-700'}`}>
-                            Month-wise total: <strong>₹{allocatedTotal}</strong> of <strong>₹{amountNum || 0}</strong>
-                            {!totalsMatch && ` — ₹${amountNum - allocatedTotal} unallocated`}
-                        </div>
-                    </div>
-                    <DialogFooter>
+            <Modal
+                open={showRemarkDialog}
+                onClose={() => setShowRemarkDialog(false)}
+                title="Remarks aur month-wise amount"
+                description="Har month ki rakam badal sakte hain - total paid amount ke barabar rehna chahiye."
+                footer={
+                    <>
                         <Button
                             variant="outline"
                             onClick={() => {
@@ -746,9 +676,72 @@ export function SmartEntryForm({ users, onPaymentSuccess }: SmartEntryFormProps)
                         <Button onClick={() => setShowRemarkDialog(false)}>
                             Done
                         </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
+                    </>
+                }
+            >
+                <div className="space-y-4">
+                    <div className="flex flex-col gap-2 sm:flex-row">
+                        <Input
+                            type="text"
+                            placeholder="Sab months ke liye ek remark"
+                            value={globalRemark}
+                            onChange={(e) => setGlobalRemark(e.target.value)}
+                            className={`${inputCls} flex-1`}
+                        />
+                        <Button type="button" variant="outline" onClick={applyGlobalRemark} className="h-11 sm:h-10">
+                            Sab par lagayein
+                        </Button>
+                    </div>
+                    <div className="space-y-2.5">
+                        {allocations.map(a => {
+                            const monthKey = monthKeyOf(a);
+                            return (
+                                <div key={monthKey} className="space-y-2 rounded-xl bg-muted/60 p-3">
+                                    <label className="text-sm font-semibold text-primary">
+                                        {a.monthName} {a.year}
+                                    </label>
+                                    <div className="grid grid-cols-[7rem_1fr] gap-2">
+                                        <Input
+                                            type="number"
+                                            inputMode="numeric"
+                                            min={1}
+                                            step={1}
+                                            placeholder="Amount"
+                                            aria-label={`Amount for ${a.monthName} ${a.year}`}
+                                            // `||` here meant a typed 0 silently fell back to
+                                            // the calculated amount on screen while 0 was what
+                                            // actually got submitted.
+                                            value={customAmounts[monthKey] ?? a.amount}
+                                            onChange={(e) => {
+                                                const raw = e.target.value;
+                                                setCustomAmounts(prev => {
+                                                    const next = { ...prev };
+                                                    if (raw === '') delete next[monthKey];
+                                                    else next[monthKey] = Number(raw);
+                                                    return next;
+                                                });
+                                            }}
+                                            className={inputCls}
+                                        />
+                                        <Input
+                                            type="text"
+                                            placeholder="Remark (optional)"
+                                            aria-label={`Remark for ${a.monthName} ${a.year}`}
+                                            value={remarks[monthKey] || ''}
+                                            onChange={(e) => setRemarks({ ...remarks, [monthKey]: e.target.value })}
+                                            className={inputCls}
+                                        />
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                    <div className={`rounded-xl px-3.5 py-2.5 text-sm ${totalsMatch ? 'bg-emerald-50 text-emerald-900' : 'bg-red-50 text-red-700'}`}>
+                        Month-wise total: <strong>₹{allocatedTotal}</strong> of <strong>₹{amountNum || 0}</strong>
+                        {!totalsMatch && ` — ₹${amountNum - allocatedTotal} unallocated`}
+                    </div>
+                </div>
+            </Modal>
         </>
     );
 }

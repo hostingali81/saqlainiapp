@@ -46,7 +46,7 @@ export function Header() {
     const formattedAmount = totalAmount !== null ? formatIndianCurrency(totalAmount) : null;
 
     return (
-        <header className="sticky top-0 z-40 glass-header">
+        <header className="sticky top-0 z-40 glass-header" style={{ paddingTop: 'env(safe-area-inset-top)' }}>
             {/* Radial dot pattern overlay */}
             <div
                 className="absolute inset-0 pointer-events-none"

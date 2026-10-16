@@ -16,7 +16,8 @@ async function MonthlyHistoryContent() {
 
     // This page is public, but the audio generator is admin-only now. Hide the
     // link from visitors instead of bouncing them to a login screen.
-    const { data: { user: adminUser } } = await supabase.auth.getUser();
+    // Runs alongside the data below rather than before it.
+    const authPromise = supabase.auth.getUser();
 
     // Every one of these must be paged: Supabase stops at 1000 rows, and
     // `db_chanda` / `user_list` used to be read with a plain select, so their
@@ -33,6 +34,7 @@ async function MonthlyHistoryContent() {
             () => supabase.from('user_list').select('bakaya_month, amount').order('id')
         ),
     ]);
+    const { data: { user: adminUser } } = await authPromise;
 
     const loadError = monthlyResult.error || chandaResult.error || expensesResult.error || bakayaResult.error;
     if (loadError) {
@@ -83,24 +85,26 @@ async function MonthlyHistoryContent() {
         0
     );
 
-    // 6. Get monthly breakdown
-    const monthlyBreakdown = allMonthly.reduce((acc: any[], payment) => {
+    // 6. Get monthly breakdown (a Map: scanning the month list for every one
+    // of thousands of payments was quadratic).
+    const byMonth = new Map<string, { key: string; year: number; month: number; totalAmount: number; users: Set<number>; transactionCount: number }>();
+    for (const payment of allMonthly) {
         const key = `${payment.year}-${payment.month}`;
-        const existing = acc.find(item => item.key === key);
+        const existing = byMonth.get(key);
         if (existing) {
             existing.totalAmount += payment.amount || 0;
             existing.users.add(payment.user_id);
             existing.transactionCount++;
         } else {
-            acc.push({
+            byMonth.set(key, {
                 key, year: payment.year, month: payment.month,
                 totalAmount: payment.amount || 0,
                 users: new Set([payment.user_id]),
                 transactionCount: 1
             });
         }
-        return acc;
-    }, []) || [];
+    }
+    const monthlyBreakdown = Array.from(byMonth.values());
 
     const collections = monthlyBreakdown
         .map(item => ({

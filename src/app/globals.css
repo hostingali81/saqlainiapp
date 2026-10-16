@@ -389,3 +389,68 @@
     grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   }
 }
+/* ========================================== */
+/* NATIVE-APP FEEL (touch screens / installed app) */
+/* Additive only - nothing above is changed.        */
+/* ========================================== */
+
+/* No 300ms double-tap-zoom delay: taps register instantly. */
+html {
+  touch-action: manipulation;
+  -webkit-text-size-adjust: 100%;
+}
+
+/* Controls and chrome are not text: no accidental selection / callout on long-press. */
+a,
+button,
+[role="button"],
+[role="tab"],
+summary,
+label,
+nav,
+header {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+input,
+textarea,
+[contenteditable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+img {
+  -webkit-user-drag: none;
+  -webkit-touch-callout: none;
+}
+
+/* Installed app only: no rubber-band / pull-to-refresh reload. */
+@media (display-mode: standalone) {
+  html,
+  body {
+    overscroll-behavior-y: none;
+  }
+}
+
+/* Touch screens: hover effects stuck after a tap, so drop the lift and give a
+   press-in instead. Mouse users keep the existing hover effects. */
+@media (hover: none) {
+
+  .glass-card:hover,
+  .user-card-islamic:hover,
+  .stat-card-islamic:hover,
+  .call-button-islamic:hover,
+  .smooth-hover:hover,
+  .nav-item-islamic:hover {
+    transform: none;
+  }
+
+  .glass-card:active,
+  .user-card-islamic:active,
+  .stat-card-islamic:active {
+    transform: scale(0.985);
+    transition-duration: 0.12s;
+  }
+}
